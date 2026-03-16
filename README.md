@@ -2,6 +2,8 @@
 
 **By Manthan Patel (@LeadGenMan)**
 
+- 🔗 [LinkedIn](https://www.linkedin.com/in/leadgenmanthan/) • 📸 [Instagram](https://www.instagram.com/leadgenman/) • 🎥 [YouTube](https://www.youtube.com/@LeadGenMan) • 🎵 [TikTok](https://www.tiktok.com/@leadgenmanthan)
+
 ---
 
 This is the exact system I use to build entire outbound campaigns using AI + [Saleshandy](https://www.saleshandy.com/?p=v3&via=manthan). From finding companies to scoring ICPs, writing personalized emails, and pushing live campaigns — all with natural language prompts.
