@@ -43,6 +43,16 @@ sequence.json format:
     ...
   ]
 }
+
+Available email placeholders (use in subject + body):
+  Standard:
+    {{first_name}}, {{last_name}}, {{email}}
+
+  Custom fields (if provided in leads CSV):
+    {{title}}, {{job_title}}, {{company_domain}}, {{company_name}},
+    {{buyer_context}}, {{deal_name}}, {{segment}}, {{linkedin_url}},
+    {{phone_number}}, {{best_phone}}, {{industry}}, {{company_size}},
+    {{revenue}}, {{location}}
 """
 import argparse, json, os, sys, time, yaml, pandas as pd, requests
 
@@ -137,21 +147,29 @@ def upload_leads(api_key, cid, leads_csv, email_col="send_to_email"):
         if not email or email == "nan":
             continue
 
+        # Standard fields (required)
         lead = {
             "email": email,
             "first_name": str(row.get("first_name", "")).strip() if pd.notna(row.get("first_name")) else "",
             "last_name": str(row.get("last_name", "")).strip() if pd.notna(row.get("last_name")) else "",
-            "company_name": str(row.get("company", row.get("company_name", ""))).strip() if pd.notna(row.get("company", row.get("company_name"))) else "",
-            "phone_number": str(row.get("best_phone", "")).strip() if pd.notna(row.get("best_phone")) else "",
-            "linkedin_profile": str(row.get("linkedin_url", "")).strip() if pd.notna(row.get("linkedin_url")) else "",
         }
-        # Custom fields
+
+        # Custom fields (optional - stored as lead attributes for personalization)
         custom = {}
-        for col in ["title", "job_title", "deal_name", "segment"]:
+        custom_field_names = [
+            "title", "job_title", "company_domain", "company_name", "company",
+            "buyer_context", "deal_name", "segment", "linkedin_url", "phone_number",
+            "best_phone", "industry", "company_size", "revenue", "location"
+        ]
+        for col in custom_field_names:
             if col in row and pd.notna(row[col]):
-                custom[col] = str(row[col]).strip()
+                val = str(row[col]).strip()
+                if val and val != "nan":
+                    custom[col] = val
+
         if custom:
             lead["custom_fields"] = custom
+
         leads.append(lead)
 
     for i in range(0, len(leads), 100):
