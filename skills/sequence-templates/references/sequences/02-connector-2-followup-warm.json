@@ -1,0 +1,29 @@
+{
+  "nodeType": "CONNECTION_REQUEST",
+  "payload": { "messages": [] },
+  "conditionalNode": {
+    "nodeType": "MESSAGE",
+    "actionDelay": 1, "actionDelayUnit": "DAY",
+    "payload": {
+      "messages": ["Thanks for connecting, {FIRST_NAME}! I work with teams at companies like {COMPANY} on <outcome>. Mind if I share a quick idea?"],
+      "fallbackMessage": "Thanks for connecting! I work with teams on <outcome> — mind if I share a quick idea?"
+    },
+    "conditionalNode": { "nodeType": "END", "actionDelay": 3, "actionDelayUnit": "HOUR" },
+    "unconditionalNode": {
+      "nodeType": "MESSAGE",
+      "actionDelay": 3, "actionDelayUnit": "DAY",
+      "payload": {
+        "messages": ["No worries if now's not the time, {FIRST_NAME}. In case it's useful — <one specific, relevant insight or resource>. Happy to send more if helpful."],
+        "fallbackMessage": "No worries if now's not the time. In case it's useful — <one specific, relevant insight or resource>."
+      },
+      "conditionalNode": { "nodeType": "END", "actionDelay": 3, "actionDelayUnit": "HOUR" },
+      "unconditionalNode": { "nodeType": "END", "actionDelay": 3, "actionDelayUnit": "DAY" }
+    }
+  },
+  "unconditionalNode": {
+    "nodeType": "LIKE_POST",
+    "actionDelay": 7, "actionDelayUnit": "DAY",
+    "payload": { "reactBefore": "MONTH1", "skipDelayIfCannotLike": true },
+    "unconditionalNode": { "nodeType": "END", "actionDelay": 3, "actionDelayUnit": "HOUR" }
+  }
+}
