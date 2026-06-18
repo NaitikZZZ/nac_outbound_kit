@@ -3,7 +3,7 @@ Create a full Smartlead campaign end-to-end:
   1. Create campaign
   2. Save email sequence (5-step or 1-step)
   3. Attach sender email accounts (region-matched)
-  4. Set schedule (timezone-aware)
+  4. Set schedule (timezone-aware, with hardcoded defaults)
   5. Configure settings (stop on reply, unsubscribe)
   6. Upload leads (batched at 100 per request)
   7. Leave PAUSED for user review
@@ -13,8 +13,18 @@ Usage:
     --name "P1_EVENTS_PREEVENT_US_EMAIL_naitik_16APR26" \\
     --leads leads.csv \\
     --sequence sequence.json \\
-    --accounts 50 \\
-    --timezone America/New_York
+    --accounts 50
+
+  # Override defaults if needed:
+  python 06_smartlead_create_campaign.py \\
+    --name "..." --leads ... --sequence ... \\
+    --timezone America/Los_Angeles --max-daily 100
+
+Defaults applied automatically (from config/smartlead-campaign-defaults.yaml):
+  - Timezone: Asia/Calcutta
+  - Schedule: 9am-6pm Mon-Fri
+  - Interval: 20 minutes
+  - Daily limit: 200 leads/day
 
 Required env:
   SMARTLEAD_API_KEY - your Smartlead API key (from Settings > API Keys)
@@ -34,9 +44,18 @@ sequence.json format:
   ]
 }
 """
-import argparse, json, os, sys, time, pandas as pd, requests
+import argparse, json, os, sys, time, yaml, pandas as pd, requests
 
 BASE = "https://server.smartlead.ai/api/v1"
+
+
+def load_defaults():
+    """Load hardcoded campaign defaults from YAML config."""
+    config_path = os.path.join(os.path.dirname(__file__), "..", "config", "smartlead-campaign-defaults.yaml")
+    if not os.path.exists(config_path):
+        return {}
+    with open(config_path) as f:
+        return yaml.safe_load(f) or {}
 
 
 def create_campaign(api_key, name):
@@ -166,17 +185,20 @@ def upload_leads(api_key, cid, leads_csv, email_col="send_to_email"):
 
 
 if __name__ == "__main__":
+    defaults = load_defaults()
+    sched_defaults = defaults.get("scheduling", {})
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--name", required=True, help="Campaign name (use naming convention)")
     parser.add_argument("--leads", required=True, help="Path to leads CSV")
     parser.add_argument("--sequence", required=True, help="Path to sequence JSON file")
     parser.add_argument("--accounts-json", help="JSON file with account IDs list (from Smartlead get_all_email_accounts)")
     parser.add_argument("--num-accounts", type=int, default=50, help="Number of accounts to attach (default 50)")
-    parser.add_argument("--timezone", default="America/New_York", help="IANA timezone")
-    parser.add_argument("--start-hour", default="09:00")
-    parser.add_argument("--end-hour", default="17:00")
-    parser.add_argument("--min-gap", type=int, default=10, help="Minutes between emails per inbox")
-    parser.add_argument("--max-daily", type=int, default=50, help="Max new leads activated per day")
+    parser.add_argument("--timezone", default=sched_defaults.get("timezone", "Asia/Calcutta"), help="IANA timezone (hardcoded default: Asia/Calcutta)")
+    parser.add_argument("--start-hour", type=int, default=sched_defaults.get("sending_window", {}).get("start_hour", 9), help="Start hour 0-23 (hardcoded default: 9)")
+    parser.add_argument("--end-hour", type=int, default=sched_defaults.get("sending_window", {}).get("end_hour", 18), help="End hour 0-23 (hardcoded default: 18)")
+    parser.add_argument("--min-gap", type=int, default=sched_defaults.get("sending_interval_minutes", 20), help="Minutes between emails per inbox (hardcoded default: 20)")
+    parser.add_argument("--max-daily", type=int, default=sched_defaults.get("daily_lead_limit", 200), help="Max new leads activated per day (hardcoded default: 200)")
     parser.add_argument("--email-col", default="send_to_email", help="Column in leads CSV with sending email")
     args = parser.parse_args()
 
@@ -205,4 +227,6 @@ if __name__ == "__main__":
     print(f"Name: {args.name}")
     print(f"Leads uploaded: {uploaded}")
     print(f"Leads blocked: {failed}")
+    print(f"Timezone: {args.timezone}")
+    print(f"Schedule: {args.start_hour}am-{args.end_hour}pm, {args.min_gap}min interval, {args.max_daily} leads/day")
     print(f"Status: PAUSED (review in Smartlead UI, flip to START when ready)")
