@@ -1,0 +1,15 @@
+{
+  "nodeType": "CONNECTION_REQUEST",
+  "payload": { "messages": [] },
+  "conditionalNode": {
+    "nodeType": "MESSAGE",
+    "actionDelay": 1, "actionDelayUnit": "DAY",
+    "payload": {
+      "messages": ["Thanks for connecting, {FIRST_NAME}! I noticed you lead {POSITION} at {COMPANY} — curious how you're currently handling <pain point>. Open to a quick chat?"],
+      "fallbackMessage": "Thanks for connecting! Curious how you're currently handling <pain point> — open to a quick chat?"
+    },
+    "conditionalNode": { "nodeType": "END", "actionDelay": 3, "actionDelayUnit": "HOUR" },
+    "unconditionalNode": { "nodeType": "END", "actionDelay": 3, "actionDelayUnit": "DAY" }
+  },
+  "unconditionalNode": { "nodeType": "END", "actionDelay": 7, "actionDelayUnit": "DAY" }
+}
