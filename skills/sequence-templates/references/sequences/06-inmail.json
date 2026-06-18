@@ -1,0 +1,17 @@
+{
+  "nodeType": "INMAIL",
+  "payload": {
+    "messages": [
+      {
+        "subject": "Quick question, {FIRST_NAME}",
+        "message": "Hi {FIRST_NAME}, I work with <role>s at companies like {COMPANY} on <outcome>. <One specific, relevant observation>. Worth a short conversation to see if it's relevant for you?"
+      }
+    ],
+    "fallbackMessage": {
+      "subject": "Quick question",
+      "message": "Hi, I work with teams on <outcome>. <One specific, relevant observation>. Worth a short conversation to see if it's relevant for you?"
+    }
+  },
+  "conditionalNode": { "nodeType": "END", "actionDelay": 3, "actionDelayUnit": "HOUR" },
+  "unconditionalNode": { "nodeType": "END", "actionDelay": 3, "actionDelayUnit": "DAY" }
+}
