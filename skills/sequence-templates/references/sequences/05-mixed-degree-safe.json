@@ -1,0 +1,29 @@
+{
+  "nodeType": "CHECK_IS_CONNECTION",
+  "conditionalNode": {
+    "nodeType": "MESSAGE",
+    "actionDelay": 3, "actionDelayUnit": "HOUR",
+    "payload": {
+      "messages": ["Hi {FIRST_NAME}, we're already connected — wanted to reach out directly. <One-line relevant reason>. Open to a quick chat?"],
+      "fallbackMessage": "Hi, we're already connected — wanted to reach out directly. <One-line relevant reason>. Open to a quick chat?"
+    },
+    "conditionalNode": { "nodeType": "END", "actionDelay": 3, "actionDelayUnit": "HOUR" },
+    "unconditionalNode": { "nodeType": "END", "actionDelay": 3, "actionDelayUnit": "DAY" }
+  },
+  "unconditionalNode": {
+    "nodeType": "CONNECTION_REQUEST",
+    "actionDelay": 3, "actionDelayUnit": "HOUR",
+    "payload": { "messages": [] },
+    "conditionalNode": {
+      "nodeType": "MESSAGE",
+      "actionDelay": 1, "actionDelayUnit": "DAY",
+      "payload": {
+        "messages": ["Thanks for connecting, {FIRST_NAME}! <One-line relevant reason for reaching out>. Open to a quick chat?"],
+        "fallbackMessage": "Thanks for connecting! <One-line relevant reason for reaching out>. Open to a quick chat?"
+      },
+      "conditionalNode": { "nodeType": "END", "actionDelay": 3, "actionDelayUnit": "HOUR" },
+      "unconditionalNode": { "nodeType": "END", "actionDelay": 3, "actionDelayUnit": "DAY" }
+    },
+    "unconditionalNode": { "nodeType": "END", "actionDelay": 7, "actionDelayUnit": "DAY" }
+  }
+}
