@@ -99,7 +99,7 @@ def merge_all(input_dir, original_csv, output_path):
         print(f"  Merged ZeroBounce: {(zb['zb_status']=='valid').sum()} valid")
 
     # Compute readiness flags
-    master["smartlead_ready"] = master["zb_status"].isin(["valid", "catch-all"]) if "zb_status" in master.columns else False
+    master["smartlead_ready"] = (master["zb_status"] == "valid") if "zb_status" in master.columns else False
     master["heyreach_ready"] = master["linkedin_url"].notna() & (master["linkedin_url"].astype(str).str.strip() != "") & (master["linkedin_url"].astype(str) != "nan") if "linkedin_url" in master.columns else False
 
     # Build send_to_email: Clay work email if present and different, else original

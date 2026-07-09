@@ -122,14 +122,14 @@ Classifies every email into:
 
 | Status | Meaning | Action |
 |--------|---------|--------|
-| `valid` | Confirmed deliverable | Safe to send |
-| `catch-all` | Domain accepts all | Send with caution (some bounces) |
+| `valid` | Confirmed deliverable | Keep, only status sent to Smartlead |
+| `catch-all` | Domain accepts all | Drop |
 | `invalid` | Mailbox doesn't exist | Drop, will bounce |
 | `do_not_mail` | Disposable / role / spam trap | Drop |
-| `unknown` | Couldn't determine | Drop or re-verify later |
-| `error` | Timeout / API error | Retry |
+| `unknown` | Couldn't determine | Drop |
+| `error` | Timeout / API error | Retry, drop if still unresolved |
 
-**Critical:** Run this BEFORE uploading to Smartlead. Catch bounces before they touch your sender reputation.
+**Critical:** Run this BEFORE uploading to Smartlead. Only `valid` goes to Smartlead, drop every other status.
 
 ---
 
@@ -148,7 +148,7 @@ Combines all intermediate CSVs into a single `MASTER_enriched.csv`:
 
 Adds computed columns:
 - `send_to_email` - Clay work email if available, else original email
-- `smartlead_ready` - True if ZB status is valid or catch-all
+- `smartlead_ready` - True only if ZB status is valid (everything else dropped)
 - `heyreach_ready` - True if LinkedIn URL present
 - `has_phone` - True if any phone source returned a number
 
@@ -174,7 +174,7 @@ Compared to a bare "throw it at Clay for everything" approach (~$200-500), the w
 
 ## Skip Steps For
 
-- **Under 50 leads:** Just run Clay end-to-end, don't waste time splitting
-- **Only emails + companies (no LinkedIn needed):** Skip Apollo, go Clay-first
+- **Under 50 leads:** Still run Apollo Steps 1-2 first, then Clay for whatever's left. Skip the segment-splitting overhead, not Apollo itself.
+- **Only emails + companies (no LinkedIn needed):** Apollo is always the first provider regardless of what fields you need. Only fall through to Clay for what Apollo can't find.
 - **Only LinkedIn needed (HeyReach campaigns):** Skip ZeroBounce
 - **Already have verified emails:** Skip Steps 1-4, go straight to Smartlead upload
