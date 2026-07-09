@@ -272,6 +272,7 @@ Never skip ZeroBounce. Bad emails tank sender reputation.
 - `docs/cadence-blueprint.md` - 11-day multi-channel cadence
 - `docs/data-enrichment-waterfall.md` - full enrichment flow
 - `docs/campaign-naming-convention.md` - naming standard
+- `docs/content-agent-rules.md` - punctuation, banned phrases/buzzwords, humanizer voice, A/B testing, CSV/normalization defaults
 
 ---
 
