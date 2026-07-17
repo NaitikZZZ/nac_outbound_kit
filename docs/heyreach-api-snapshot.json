@@ -1,0 +1,468 @@
+{
+  "synced": "2026-07-17 09:58 UTC",
+  "count": 66,
+  "endpoints": [
+    {
+      "group": "LeadTags",
+      "name": "CreateTags",
+      "method": "POST",
+      "path": "/lead_tags/CreateTags",
+      "description": "<p>Create one or multiple tags for your workspace. You can assign these tags to leads. Available colors: Blue, Green, Purple, Pink, Red, Cyan, Yellow, Orange.</p>"
+    },
+    {
+      "group": "LinkedIn Accounts",
+      "name": "GetLinkedInAccounts",
+      "method": "POST",
+      "path": "/management/organizations/linkedin-accounts",
+      "description": "<p>Retrieve LinkedIn accounts across your organization. Supports pagination, optional <code>keyword</code> search and filtering by <code>workspaceIds</code> (empty/omitted returns all workspaces). Requires the Master (Organization) API Key.</p>"
+    },
+    {
+      "group": "LinkedIn Accounts",
+      "name": "DeleteLinkedInAccount",
+      "method": "DELETE",
+      "path": "/management/organizations/linkedin-accounts/:linkedInAccountId",
+      "description": "<p>Delete a LinkedIn account by its ID. This soft-deletes the LinkedIn account.</p> <ul> <li><code>forceDelete=false</code> (default): deletion fails with 400 if the account belongs to an active campaign.</li> <li><code>forceDelete=true</code>: the account is removed from active campaigns and then d"
+    },
+    {
+      "group": "LinkedIn Accounts",
+      "name": "MoveToWorkspace",
+      "method": "POST",
+      "path": "/management/organizations/linkedin-accounts/MoveToWorkspace",
+      "description": "<p>Move a LinkedIn account from its current workspace to another workspace. Requires the Master (Organization) API Key.</p>"
+    },
+    {
+      "group": "PublicAuthentication",
+      "name": "CheckApiKey",
+      "method": "GET",
+      "path": "/auth/CheckApiKey",
+      "description": "<p>Check If your API key is working.</p>"
+    },
+    {
+      "group": "PublicCampaigns",
+      "name": "AddLeadsToCampaign",
+      "method": "POST",
+      "path": "/campaign/AddLeadsToCampaign",
+      "description": "<p>Add leads to a campaign. Add up to 100 leads per request. If a LinkedIn account Idis specified in the AccountLeadPairs, that lead will be mapped to the accountin the campaign.</p> <p><strong>The</strong> <strong><code>name</code></strong> <strong>field in the</strong> <strong><code>customUserFiel"
+    },
+    {
+      "group": "PublicCampaigns",
+      "name": "AddLeadsToCampaignV2",
+      "method": "POST",
+      "path": "/campaign/AddLeadsToCampaignV2",
+      "description": "<p>Add leads to a campaign. Add up to 100 leads per request. If a LinkedIn account Idis specified in the AccountLeadPairs, that lead will be mapped to the accountin the campaign. Same as the <strong>AddLeadsToCampaign</strong> request, however this request returns counts for how many of the leads we"
+    },
+    {
+      "group": "PublicCampaigns",
+      "name": "AddLinkedInAccountsToCampaign",
+      "method": "POST",
+      "path": "/campaign/AddLinkedInAccountsToCampaign",
+      "description": "<p>Add LinkedIn accounts as senders to an existing campaign. Previously added senders remain unchanged.</p> <p>Up to 100 LinkedIn accounts can be processed per request. Individual account failures do not fail the whole request; each account returns its own result. When <code>success</code> is false,"
+    },
+    {
+      "group": "PublicCampaigns",
+      "name": "Create",
+      "method": "POST",
+      "path": "/campaign/Create",
+      "description": "<h2 id=\"creates-a-campaign-in-draft-status\">Creates a campaign in DRAFT status.</h2> <p>After the campaign is fully configured, call <strong>StartCampaign</strong> (<code>POST /api/public/campaign/StartCampaign?campaignId=</code>) to activate it.</p> <p><strong>Important:</strong> a campaign cannot "
+    },
+    {
+      "group": "PublicCampaigns",
+      "name": "CreateCampaignFromTemplate",
+      "method": "POST",
+      "path": "/campaign/CreateCampaignFromTemplate",
+      "description": "<h2 id=\"creates-a-new-campaign-by-cloning-the-sequence-and-schedule-of-an-existing-campaign-the-template\">Creates a new campaign by cloning the sequence and schedule of an existing campaign (the template).</h2> <p>The new campaign is created in DRAFT status. The sequence (workflow) and schedule are "
+    },
+    {
+      "group": "PublicCampaigns",
+      "name": "GetAll",
+      "method": "POST",
+      "path": "/campaign/GetAll",
+      "description": "<p>Get a paginated collection of all campaigns. Get up to 100 campaigns per request.</p>"
+    },
+    {
+      "group": "PublicCampaigns",
+      "name": "GetById",
+      "method": "GET",
+      "path": "/campaign/GetById",
+      "description": "<p>Get a Campaign by id</p>"
+    },
+    {
+      "group": "PublicCampaigns",
+      "name": "GetCampaignSequence",
+      "method": "GET",
+      "path": "/campaign/GetCampaignSequence",
+      "description": "<h2 id=\"retrieves-the-current-sequence-workflow-of-a-campaign-as-a-publicsequencenodedto\">Retrieves the current sequence (workflow) of a campaign as a PublicSequenceNodeDto.</h2> <p>The returned object is directly compatible with the <code>sequence</code> field in <strong>Create</strong> and <strong"
+    },
+    {
+      "group": "PublicCampaigns",
+      "name": "GetCampaignsForLead",
+      "method": "POST",
+      "path": "/campaign/GetCampaignsForLead",
+      "description": "<h2 id=\"gets-campaigns-for-a-lead\">Gets Campaigns for a Lead</h2> <p>Retrieves the list of campaigns where the specified lead is.</p> <p><strong>Remark:</strong> The response will contain campaigns that match the provided lead information, such as email, LinkedIn ID, or profile URL.</p> <h3 id=\"body"
+    },
+    {
+      "group": "PublicCampaigns",
+      "name": "GetLeadsFromCampaign",
+      "method": "POST",
+      "path": "/campaign/GetLeadsFromCampaign",
+      "description": "<h2 id=\"gets-the-leads-that-are-in-a-campaign\">Gets the leads that are in a campaign.</h2> <p>This request corresponds to the \"Lead Analytics\" screen in the UI.<br /><strong>Remark:</strong> It shows only the \"Pending\" leads that are about to start executing actions in the campaign. There might be m"
+    },
+    {
+      "group": "PublicCampaigns",
+      "name": "Pause",
+      "method": "POST",
+      "path": "/campaign/Pause",
+      "description": "<p>Pauses the specified campaign.</p>"
+    },
+    {
+      "group": "PublicCampaigns",
+      "name": "RemoveLinkedInAccountsFromCampaign",
+      "method": "POST",
+      "path": "/campaign/RemoveLinkedInAccountsFromCampaign",
+      "description": "<p>Remove LinkedIn accounts from a campaign.</p> <p>Up to 100 LinkedIn accounts can be processed per request. Individual account failures do not fail the whole request; each account returns its own <code>status</code>, one of: <code>Success</code>, <code>NotPartOfThisCampaign</code>, <code>NotFound<"
+    },
+    {
+      "group": "PublicCampaigns",
+      "name": "Resume",
+      "method": "POST",
+      "path": "/campaign/Resume",
+      "description": "<p>Resumes the specified campaign.</p>"
+    },
+    {
+      "group": "PublicCampaigns",
+      "name": "StartCampaign",
+      "method": "POST",
+      "path": "/campaign/StartCampaign",
+      "description": "<h2 id=\"activates-a-campaign-that-was-created-via-create\">Activates a campaign that was created via <strong>Create</strong>.</h2> <p>Call this after <strong>Create</strong> (and after any <strong>UpdateSequence</strong> / <strong>UpdateSchedule</strong> / <strong>UpdateAccounts</strong> configuratio"
+    },
+    {
+      "group": "PublicCampaigns",
+      "name": "StopLeadInCampaign",
+      "method": "POST",
+      "path": "/campaign/StopLeadInCampaign",
+      "description": "<h1 id=\"stops-a-lead-in-a-campaign\"><em>Stops a lead in a campaign</em></h1> <p>Call this method if you want to stop the progression of a lead in a campaign.</p> <h3 id=\"body-parameters\">Body Parameters</h3> <ul> <li><p><strong>campaignId</strong> <em>(integer)</em>: The ID of the campaign.</p> </li"
+    },
+    {
+      "group": "PublicCampaigns",
+      "name": "UpdateAccounts",
+      "method": "POST",
+      "path": "/campaign/UpdateAccounts",
+      "description": "<h2 id=\"replaces-the-entire-list-of-linkedin-sender-accounts-assigned-to-a-campaign\">Replaces the entire list of LinkedIn sender accounts assigned to a campaign.</h2> <p>This is a <strong>full replacement</strong>, not a merge. Any account not in the new list will be removed. On a PAUSED campaign, l"
+    },
+    {
+      "group": "PublicCampaigns",
+      "name": "UpdateLeadCustomFields",
+      "method": "PATCH",
+      "path": "/campaign/UpdateLeadCustomFields/campaigns/:campaignId/leads/custom-fields",
+      "description": "<p>Update (upsert) custom fields on a lead in a campaign. Keys are field names, values are field values.</p> <ul> <li>If a field exists: its value is updated.</li> <li>If a field does not exist: it is created.</li> <li>If the value is null or an empty string: the field is deleted.</li> </ul> <p>Up t"
+    },
+    {
+      "group": "PublicCampaigns",
+      "name": "UpdateSchedule",
+      "method": "POST",
+      "path": "/campaign/UpdateSchedule",
+      "description": "<h2 id=\"replaces-the-schedule-of-a-campaign\">Replaces the schedule of a campaign.</h2> <p>Defines when the campaign runs each day, which days it is active, the timezone, and optional start/end dates.</p> <p>Allowed statuses: DRAFT, SCHEDULED, PAUSED. Returns 400 for any other status (e.g. IN_PROGRES"
+    },
+    {
+      "group": "PublicCampaigns",
+      "name": "UpdateSequence",
+      "method": "POST",
+      "path": "/campaign/UpdateSequence",
+      "description": "<h2 id=\"creates-or-fully-replaces-the-sequence-workflow-of-a-campaign\">Creates or fully replaces the sequence (workflow) of a campaign.</h2> <p>The START node is implicit; the root of the request must be your first action node. Every path through the tree must terminate with an <strong>END</strong> "
+    },
+    {
+      "group": "PublicCampaigns",
+      "name": "UpdateSettings",
+      "method": "POST",
+      "path": "/campaign/UpdateSettings",
+      "description": "<h2 id=\"updates-the-general-settings-of-a-campaign-name-lead-list-and-exclusion-options\">Updates the general settings of a campaign: name, lead list, and exclusion options.</h2> <p>Allowed statuses: DRAFT, SCHEDULED, PAUSED. Returns 400 for any other status (e.g. IN_PROGRESS, FINISHED). If the campa"
+    },
+    {
+      "group": "PublicInbox",
+      "name": "GetChatroom",
+      "method": "GET",
+      "path": "/inbox/GetChatroom/:accountId/:conversationId",
+      "description": "<p>Get a LinkedIn conversation with its messages by Id.</p>"
+    },
+    {
+      "group": "PublicInbox",
+      "name": "GetConversationsV2",
+      "method": "POST",
+      "path": "/inbox/GetConversationsV2",
+      "description": "<p>Get a paginated collection of LinkedIn conversations. Get up to 100 lists per request.</p> <h3 id=\"body-parameters\">Body Parameters</h3> <ul> <li><p><strong>filters</strong></p> <ul> <li><p><strong>linkedInAccountIds</strong> (int[])<strong>:</strong> The ids of the LinkedIn senders</p> </li> <li"
+    },
+    {
+      "group": "PublicInbox",
+      "name": "SendMessage",
+      "method": "POST",
+      "path": "/inbox/SendMessage",
+      "description": "<p>Send a message to a LinkedIn conversation.</p> <p>Parameters:</p> <ul> <li><strong>linkedInAccountId</strong> - The id of your LinkedIn sender</li> </ul>"
+    },
+    {
+      "group": "PublicInbox",
+      "name": "SetSeenStatus",
+      "method": "POST",
+      "path": "/inbox/SetSeenStatus",
+      "description": "<p>Mark a given conversation as seen or unseen based on the seen parameter.</p>"
+    },
+    {
+      "group": "PublicLead",
+      "name": "AddTags",
+      "method": "POST",
+      "path": "/lead/AddTags",
+      "description": "<h2 id=\"add-tags-to-lead\">Add Tags to Lead</h2> <p>Adds tags to the lead. Existing tags will not be changed.</p> <ul> <li><p><strong>leadProfileUrl (optional)</strong>: the linkedIn profile url of the lead, for example '<a href=\"https://www.linkedin.com/in/john-doe/'\">https://www.linkedin.com/in/joh"
+    },
+    {
+      "group": "PublicLead",
+      "name": "GetLead",
+      "method": "POST",
+      "path": "/lead/GetLead",
+      "description": "<h2 id=\"gets-lead-details\">Gets Lead Details</h2> <p>This endpoint retrieves the details of a specific lead based on their LinkedIn profile URL.</p> <p><strong>Remark:</strong> The response will provide detailed information about the lead that matches the specified profile URL.</p> <h3 id=\"body-para"
+    },
+    {
+      "group": "PublicLead",
+      "name": "GetTags",
+      "method": "POST",
+      "path": "/lead/GetTags",
+      "description": "<h2 id=\"get-tags-for-a-lead\">Get Tags for a Lead</h2> <p>Gets the tags for a lead. The tags are alphabetically sorted.</p> <ul> <li><strong>profileUrl</strong>: the linkedIn profile url of the lead, for example '<a href=\"https://www.linkedin.com/in/john-doe/'\">https://www.linkedin.com/in/john-doe/'<"
+    },
+    {
+      "group": "PublicLead",
+      "name": "ReplaceTags",
+      "method": "POST",
+      "path": "/lead/ReplaceTags",
+      "description": "<h2 id=\"replaces-tags-to-lead\">Replaces Tags to Lead</h2> <p>Removes the existing tags and replaces with the new tags.</p> <ul> <li><p><strong>leadProfileUrl (optional)</strong>: the linkedIn profile url of the lead, for example '<a href=\"https://www.linkedin.com/in/john-doe/'\">https://www.linkedin."
+    },
+    {
+      "group": "PublicLinkedInAccount",
+      "name": "GetAll",
+      "method": "POST",
+      "path": "/li_account/GetAll",
+      "description": "<p>Get a paginated collection of all LinkedIn accounts. Get up to 100 accounts per request.</p>"
+    },
+    {
+      "group": "PublicLinkedInAccount",
+      "name": "GetById",
+      "method": "GET",
+      "path": "/li_account/GetById",
+      "description": "<p>Get a LinkedIn account by id</p>"
+    },
+    {
+      "group": "PublicList",
+      "name": "AddLeadsToList",
+      "method": "POST",
+      "path": "/list/AddLeadsToList",
+      "description": "<p>Add leads to a lead list. Add up to 100 leads per request.</p> <p><strong>The</strong> <strong><code>name</code></strong> <strong>field in the</strong> <strong><code>customUserFields</code></strong> <strong>array of the leads you are importing, must contain only alpha-numeric characters or unders"
+    },
+    {
+      "group": "PublicList",
+      "name": "AddLeadsToListV2",
+      "method": "POST",
+      "path": "/list/AddLeadsToListV2",
+      "description": "<p>Add leads to a lead list. Add up to 100 leads per request. Same as the <strong>AddLeadsToList</strong> request, however this request returns counts for how many of the leads were added, how many were update and how many failed to be added.</p> <p><strong>The</strong> <strong><code>name</code></st"
+    },
+    {
+      "group": "PublicList",
+      "name": "CreateEmptyList",
+      "method": "POST",
+      "path": "/list/CreateEmptyList",
+      "description": "<p>Create an empty lead or company list. You pass the list name and the list type (<strong>USER_LIST</strong> or <strong>COMPANY_LIST</strong>). If the type value is left empty, a Lead list will be created by default.</p>"
+    },
+    {
+      "group": "PublicList",
+      "name": "DeleteLeadsFromList",
+      "method": "DELETE",
+      "path": "/list/DeleteLeadsFromList",
+      "description": "<h2 id=\"deletes-the-specified-leads-from-a-lead-list\">Deletes the specified leads from a lead list.</h2> <h3 id=\"params\">Params:</h3> <ul> <li><p><strong>listId</strong> <em>(integer)</em>: The ID of the list.</p> </li> <li><p><strong>leadMemberIds</strong> : Array of the LinkedIn IDs of the leads t"
+    },
+    {
+      "group": "PublicList",
+      "name": "DeleteLeadsFromListByProfileUrl",
+      "method": "DELETE",
+      "path": "/list/DeleteLeadsFromListByProfileUrl",
+      "description": "<h2 id=\"deletes-the-specified-leads-from-a-lead-list-by-linkedin-profile-url\">Deletes the specified leads from a lead list by LinkedIn profile url.</h2> <h3 id=\"params\">Params:</h3> <ul> <li><p><strong>listId</strong> <em>(integer)</em>: The ID of the list.</p> </li> <li><p><strong>profileUrls</stro"
+    },
+    {
+      "group": "PublicList",
+      "name": "GetAll",
+      "method": "POST",
+      "path": "/list/GetAll",
+      "description": "<p>Get a paginated collection of all company and lead lists. Get up to 100 lists per request.</p>"
+    },
+    {
+      "group": "PublicList",
+      "name": "GetById",
+      "method": "GET",
+      "path": "/list/GetById",
+      "description": "<p>Get a lead or company list by Id</p>"
+    },
+    {
+      "group": "PublicList",
+      "name": "GetCompaniesFromList",
+      "method": "POST",
+      "path": "/list/GetCompaniesFromList",
+      "description": "<p>Get a paginated collection of companies from a company list. Get up to 1000 companies per request.</p>"
+    },
+    {
+      "group": "PublicList",
+      "name": "GetLeadsFromList",
+      "method": "POST",
+      "path": "/list/GetLeadsFromList",
+      "description": "<p>Get a paginated collection of leads from a lead list. Get up to 1000 leads per request.</p> <ul> <li><p><strong>listId:</strong> The id of the lead list.</p> </li> <li><p><strong>keyword (optional)</strong>: A search term to filter leads by name or other relevant fields.</p> </li> <li><p><strong>"
+    },
+    {
+      "group": "PublicList",
+      "name": "GetListsForLead",
+      "method": "POST",
+      "path": "/list/GetListsForLead",
+      "description": "<h2 id=\"gets-lists-for-a-lead\">Gets Lists for a Lead</h2> <p>This endpoint retrieves the lists associated with a specific lead.</p> <p><strong>Remark:</strong> The response will include lead lists that match the provided lead details such as email, LinkedIn ID, or profile URL.</p> <h3 id=\"body-param"
+    },
+    {
+      "group": "PublicList",
+      "name": "UpdateLeadCustomFields",
+      "method": "PATCH",
+      "path": "/list/UpdateLeadCustomFields/lists/:listId/leads/custom-fields",
+      "description": "<p>Update (upsert) custom fields on a lead in a list. Keys are field names, values are field values.</p> <ul> <li>If a field exists: its value is updated.</li> <li>If a field does not exist: it is created.</li> <li>If the value is null or an empty string: the field is deleted.</li> </ul> <p>Up to 10"
+    },
+    {
+      "group": "PublicMyNetwork",
+      "name": "GetMyNetworkForSender",
+      "method": "POST",
+      "path": "/MyNetwork/GetMyNetworkForSender",
+      "description": "<h1 id=\"getmynetworkforsender\">GetMyNetworkForSender</h1> <p><strong>Endpoint</strong><br /><code>POST /</code>api/public/MyNetwork/GetMyNetworkForSender</p> <p><strong>Description</strong><br />Gets paginated list of the network for the specified sender</p> <hr /> <h2 id=\"request-body-example\">Requ"
+    },
+    {
+      "group": "PublicMyNetwork",
+      "name": "IsConnection",
+      "method": "POST",
+      "path": "/MyNetwork/IsConnection",
+      "description": "<h1 id=\"isconnection\">IsConnection</h1> <p><strong>Endpoint</strong><br /><code>POST /</code>api/public/MyNetwork/IsConnection</p> <p><strong>Description</strong><br />Gets a value indicating if the lead is a connection to the sender</p> <hr /> <h2 id=\"request-body-example\">Request Body Example</h2>"
+    },
+    {
+      "group": "PublicStats",
+      "name": "Get Overall Stats",
+      "method": "POST",
+      "path": "/stats/GetOverallStats",
+      "description": "<h2 id=\"gets-the-overall-stats-for-the-specified-filters\">Gets the overall stats for the specified filters.</h2> <ul> <li><p><strong>Method:</strong> <code>POST</code></p> </li> <li><p><strong>Content-Type:</strong> <code>application/json</code></p> </li> </ul> <hr /> <h2 id=\"request-body\"><strong>R"
+    },
+    {
+      "group": "PublicStats",
+      "name": "GetOverallStatsByCampaign",
+      "method": "POST",
+      "path": "/stats/GetOverallStatsByCampaign",
+      "description": "<h2 id=\"gets-the-overall-stats-broken-down-per-campaign-for-the-specified-filters\">Gets the overall stats broken down per campaign for the specified filters.</h2> <p>Same filters as <strong>GetOverallStats</strong>, but the response is grouped by campaign: both <code>byDayStats</code> and <code>over"
+    },
+    {
+      "group": "PublicWebhooks",
+      "name": "Create Webhook",
+      "method": "POST",
+      "path": "/webhooks/CreateWebhook",
+      "description": "<h1 id=\"create-webhook\">Create Webhook</h1> <p><strong>Endpoint</strong><br /><code>POST //api/public/webhooks/CreateWebhook</code></p> <p><strong>Description</strong><br />This API creates a new webhook that listens to specified events, optionally filtered by campaign IDs.</p> <hr /> <h2 id=\"reques"
+    },
+    {
+      "group": "PublicWebhooks",
+      "name": "Delete Webhook",
+      "method": "DELETE",
+      "path": "/webhooks/DeleteWebhook",
+      "description": "<h1 id=\"delete-webhook\">Delete Webhook</h1> <p><strong>Endpoint</strong><br /><code>Delete //api/public/webhooks/DeleteWebhook?webhookId=1234</code></p> <p><strong>Description</strong><br />This API deletes an existing webhook.</p> <hr /> <h2 id=\"query-parameters\">Query Parameters</h2> <ul> <li><str"
+    },
+    {
+      "group": "PublicWebhooks",
+      "name": "GetAllWebhooks",
+      "method": "POST",
+      "path": "/webhooks/GetAllWebhooks",
+      "description": "<h1 id=\"get-all-webhooks\">Get All Webhooks</h1> <p><strong>Description</strong><br />Get all webhooks.</p>"
+    },
+    {
+      "group": "PublicWebhooks",
+      "name": "Get Webhook By Id",
+      "method": "GET",
+      "path": "/webhooks/GetWebhookById",
+      "description": "<h1 id=\"get-webhook-by-id\">Get Webhook By Id</h1> <p><strong>Description</strong><br />Get a webhook by Id.</p>"
+    },
+    {
+      "group": "PublicWebhooks",
+      "name": "Update Webhook",
+      "method": "PATCH",
+      "path": "/webhooks/UpdateWebhook",
+      "description": "<h1 id=\"update-webhook\">Update Webhook</h1> <p><strong>Endpoint</strong><br /><code>PATCH //api/public/webhooks/UpdateWebhook?webhookId=1234</code></p> <p><strong>Description</strong><br />This API updates an existing webhook by modifying its configuration, such as name, URL, event type, associated "
+    },
+    {
+      "group": "Workspace API Keys",
+      "name": "GetWorkspaceApiKeys",
+      "method": "GET",
+      "path": "/management/organizations/api-keys/workspaces/:workspaceId",
+      "description": "<p>Get Public API, Make, Zapier, N8N and other relevant integration keys for a given workspace.</p>"
+    },
+    {
+      "group": "Workspace API Keys",
+      "name": "CreateWorkspaceApiKeys",
+      "method": "POST",
+      "path": "/management/organizations/api-keys/workspaces/:workspaceId",
+      "description": "<p>Generate new API/Integration (Make, Zapier, N8N etc...) keys in a given workspace. Available API key types: <strong>PUBLIC, N8N, MAKE, ZAPIER, MCP</strong></p>"
+    },
+    {
+      "group": "Workspace Users",
+      "name": "GetAllUsers",
+      "method": "POST",
+      "path": "/management/organizations/users",
+      "description": "<p>Get all existing and invited users in your organization. Filter by role and invitation status.</p>"
+    },
+    {
+      "group": "Workspace Users",
+      "name": "GetUserById",
+      "method": "GET",
+      "path": "/management/organizations/users/:userId",
+      "description": "<p>Get information about a given user.</p>"
+    },
+    {
+      "group": "Workspace Users",
+      "name": "InviteAdmins",
+      "method": "POST",
+      "path": "/management/organizations/users/invite/admins",
+      "description": "<p>Invite one or multiple users as admins in your organization. The invitation emails will not be sent, only an invitation URL is generated. You can send this URL to the relevant user in order to register them to HeyReach.</p>"
+    },
+    {
+      "group": "Workspace Users",
+      "name": "InviteManagers",
+      "method": "POST",
+      "path": "/management/organizations/users/invite/managers",
+      "description": "<p>Invite one or multiple users as managers in your organization. Manager users are special kind of users that exist outside your organization and are invited to specific workspaces. These users will not be part of you organization and only have access to the specified workspaces. These users are au"
+    },
+    {
+      "group": "Workspace Users",
+      "name": "InviteMembers",
+      "method": "POST",
+      "path": "/management/organizations/users/invite/members",
+      "description": "<p>Invite one or multiple users in your organization. Specify the relevant permissions for each invited user. The invitation emails will not be sent, only an invitation URL is generated. You can send this URL to the relevant user in order to register them to HeyReach.</p>"
+    },
+    {
+      "group": "Workspace Users",
+      "name": "GetWorkspaceUsers",
+      "method": "POST",
+      "path": "/management/organizations/users/workspaces/:workspaceId",
+      "description": "<p>Get all users in a given workspace along with their role and permissions.</p>"
+    },
+    {
+      "group": "Workspaces",
+      "name": "GetAllWorkspaces",
+      "method": "GET",
+      "path": "/management/organizations/workspaces",
+      "description": "<p>List all workspaces in your organization.</p>"
+    },
+    {
+      "group": "Workspaces",
+      "name": "CreateWorkspace",
+      "method": "POST",
+      "path": "/management/organizations/workspaces",
+      "description": "<p>Create new workspace in your organization</p>"
+    },
+    {
+      "group": "Workspaces",
+      "name": "UpdateWorkspace",
+      "method": "PATCH",
+      "path": "/management/organizations/workspaces/:workspaceId",
+      "description": "<p>Update a given workspace in your organization.</p>"
+    }
+  ]
+}

@@ -1,8 +1,10 @@
 # HeyReach API Reference
 
 > Base URL: `https://api.heyreach.io/api/public`
-> Auth: `X-API-Key` header
-> Rate limits: 100 leads per list upload, 20 connections / 50 messages per day per sender
+> Auth: `X-API-KEY` header
+> Rate limits: 300 API requests/min (shared); 100 leads per list upload; 20 connections / 50 messages per day per sender
+>
+> **Full endpoint list:** see [`heyreach-api-reference.md`](heyreach-api-reference.md) - auto-generated from the live Postman collection by `scripts/09_heyreach_api_tracker.py`. This file below is the curated, hand-written playbook (cadence, merge tags, gotchas).
 
 ## Key Endpoints for This Kit
 
@@ -37,15 +39,21 @@ Body:
 Response: {"addedLeadsCount": 100, "updatedLeadsCount": 0, "failedLeadsCount": 0}
 ```
 
-### Other endpoints (mostly used via HeyReach UI)
+### Other common endpoints (verified paths)
 
 | Purpose | Endpoint |
 |---------|----------|
-| List all campaigns | `GET /campaigns/GetAll` |
-| Get campaign details | `GET /campaigns/Get/{id}` |
-| Pause / resume campaign | `POST /campaigns/Pause/{id}` or `POST /campaigns/Resume/{id}` |
-| Get LinkedIn accounts | `GET /LinkedInAccount/GetAll` |
-| Send message | `POST /inbox/SendMessage` |
+| List all campaigns | `POST /campaign/GetAll` |
+| Get campaign details | `GET /campaign/GetById` |
+| Pause campaign | `POST /campaign/Pause` |
+| Resume campaign | `POST /campaign/Resume` |
+| Start (activate DRAFT) campaign | `POST /campaign/StartCampaign` |
+| Add leads to campaign | `POST /campaign/AddLeadsToCampaignV2` |
+| Get LinkedIn sender accounts | `POST /li_account/GetAll` |
+| Send inbox message | `POST /inbox/SendMessage` |
+| Get conversations | `POST /inbox/GetConversationsV2` |
+
+> Older versions of this table listed `GET /campaigns/GetAll`, `/campaigns/Get/{id}` and `GET /LinkedInAccount/GetAll` - those paths are wrong. Use the ones above, and see [`heyreach-api-reference.md`](heyreach-api-reference.md) for the complete, always-current list.
 
 ---
 
