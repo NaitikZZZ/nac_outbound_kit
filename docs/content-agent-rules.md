@@ -1,6 +1,11 @@
 # Content Agent Rules
 
-Style, format, and copy rules the agent applies when drafting outbound content for this kit.
+Style, format, and copy rules the agent applies when drafting outbound content for this kit. Campaign planning (persona/use-case consolidation, approved content sources, campaign types, pre-launch checklist) is covered in full by [`campaign-content-strategy-sop.md`](campaign-content-strategy-sop.md). Key points:
+- One consolidated sequence per persona, not one per use case, use cases and proof points get introduced gradually across the sequence.
+- Draw claims only from approved Xoxoday sources (website, product decks, help docs, internal wiki, approved case studies). Never invent a fact, metric, or claim.
+- Same core message (theme, proof stack) carries across email and LinkedIn, LinkedIn runs shorter/native to the channel, not a word-for-word copy.
+- No one-line emails. Every message stands on its own with enough context and value.
+- Use-Case Campaigns (persona/industry/use-case based) are reviewed ~every 6 months; Dynamic Campaigns (job changes, funding, intent signals, hiring, expansion, news) are planned and executed separately since they need current context.
 
 ## Punctuation
 - Never use em dashes (—) or en dashes (–). Use hyphens, commas, or rewrite.
@@ -23,7 +28,7 @@ Full rule set: [`cold-outbound-email-sop.md`](cold-outbound-email-sop.md) (Manoj
 - Funnel runs Email -> WhatsApp -> SDR call as a waterfall, not email alone.
 
 ## LinkedIn / WhatsApp / Call Scripts
-All formatting/banned-phrase rules apply. No sentence-count rule.
+All formatting/banned-phrase rules apply. No sentence-count rule. Same core message as the matching email step (theme, proof stack), just shorter and native to the channel, not pasted word-for-word.
 - LinkedIn: no name sign-off at the end (sender profile shows automatically).
 - Calls/WhatsApp: include name sign-off.
 
@@ -37,7 +42,7 @@ Single variant only, no A/B split. Follow the 7-email arc in `cold-outbound-emai
 "I wanted to reach out", "Would you be open to a quick chat?",
 "We help companies like yours", "Thought you might be interested",
 "Not sure if you're the right person", "Touching base", "Circling back",
-"Quick question" (as filler)
+"Quick question" (as filler), "As mentioned in my last email", "This is my final follow-up", "This is my closing note"
 
 ## Banned Buzzwords
 delve, landscape, leverage, realm, tapestry, navigate (verb), robust,

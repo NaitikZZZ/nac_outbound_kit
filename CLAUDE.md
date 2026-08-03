@@ -275,6 +275,7 @@ Full rule set: `docs/cold-outbound-email-sop.md` (Manoj Agarwal SOP, authoritati
 - `docs/data-enrichment-waterfall.md` - full enrichment flow
 - `docs/campaign-naming-convention.md` - naming standard
 - `docs/cold-outbound-email-sop.md` - Manoj Agarwal cold outbound SOP, authoritative for email 1 rules, sequencing, 7-email arc, formatting, QA checklist
+- `docs/campaign-content-strategy-sop.md` - persona/use-case consolidation, approved content sources, campaign content coverage, Use-Case vs Dynamic campaign types, pre-launch checklist
 - `docs/content-agent-rules.md` - punctuation, banned phrases/buzzwords, humanizer voice, CSV/normalization defaults
 
 ---
