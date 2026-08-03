@@ -223,14 +223,16 @@ Never skip ZeroBounce. Bad emails tank sender reputation.
 
 ## Copy Principles
 
-1. **Under 100 words per email.** Short emails get more replies.
-2. **One CTA per email.** Don't bundle asks.
-3. **Subject line under 50 characters** when possible.
+Full rule set: `docs/cold-outbound-email-sop.md` (Manoj Agarwal SOP, authoritative for cold outbound) + `docs/content-agent-rules.md`. Key points:
+
+1. **Email 1 never sells.** No stats, no ROI, no feature pitch, pure introduction, but still a complete email, not a thin one.
+2. **Emails 2+ under 100 words.** One CTA per email. Don't bundle asks.
+3. **Subject line under 50 characters** when possible, no cleverness or emojis.
 4. **HTML paragraphs** in Smartlead `email_body`, not plain text.
 5. **First sentence must hook.** Lead with a signal, not a greeting.
 6. **Personalize based on signal**, not a generic `Hi {{first_name}}`.
 7. **End with low-friction CTA.** "Worth a 15-min chat?" beats "Book a demo".
-8. **Breakup email** on the last step. Clear "last touch" framing.
+8. **Never frame any email as the last one.** No "before I close," no "closing the loop." Cadence is open-ended until the prospect replies.
 9. **Plum pitch: "your earn engine + our burn engine"** (open-loop only). Never position as closed-loop.
 
 ---
@@ -272,7 +274,8 @@ Never skip ZeroBounce. Bad emails tank sender reputation.
 - `docs/cadence-blueprint.md` - 11-day multi-channel cadence
 - `docs/data-enrichment-waterfall.md` - full enrichment flow
 - `docs/campaign-naming-convention.md` - naming standard
-- `docs/content-agent-rules.md` - punctuation, banned phrases/buzzwords, humanizer voice, A/B testing, CSV/normalization defaults
+- `docs/cold-outbound-email-sop.md` - Manoj Agarwal cold outbound SOP, authoritative for email 1 rules, sequencing, 7-email arc, formatting, QA checklist
+- `docs/content-agent-rules.md` - punctuation, banned phrases/buzzwords, humanizer voice, CSV/normalization defaults
 
 ---
 
