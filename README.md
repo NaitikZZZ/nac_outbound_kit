@@ -67,9 +67,29 @@ xoxoday-outbound-kit/
 │   ├── global-api-strategy-2026.md      2026 GTM strategy
 │   └── icp-scoring-criteria.md          ICP rubric
 │
+├── skills/                         Claude Code skills (auto-loaded from .claude/skills or here)
+│   ├── analytics-report/                HeyReach performance reports
+│   ├── campaign-launchpad/              CSV/list -> live HeyReach campaign
+│   ├── sequence-templates/               HeyReach sequence JSON + node reference
+│   └── csv-normalizer/                  Clean names/companies/locations in a lead CSV
+│
 └── examples/                       Worked examples
     └── p0-passive-pipeline/             945-lead P0 campaign walkthrough
 ```
+
+---
+
+## Available Skills
+
+Claude Code auto-loads these from `skills/` and invokes them by matching your
+request against each one's description — you don't call them by name.
+
+| Skill | What it does | Ask for it by saying |
+|---|---|---|
+| [`csv-normalizer`](skills/csv-normalizer/SKILL.md) | Cleans a lead CSV: splits full names into first/last, strips legal suffixes and "a company of X" descriptors from company names, fixes ALL-CAPS/lowercase casing, normalizes whitespace, standardizes city/state/country. Phone numbers are left untouched by design. | "clean up this lead list", "normalize these company names", "this CSV is a mess, fix the casing" |
+| [`campaign-launchpad`](skills/campaign-launchpad/SKILL.md) | Builds and launches a complete HeyReach LinkedIn campaign end-to-end — lead-list creation, CSV import, sequence selection, schedule, senders, exclusions, pre-launch checklist, start. | "spin up a HeyReach campaign from this CSV", "launch outreach to this list" |
+| [`sequence-templates`](skills/sequence-templates/SKILL.md) | Ready-to-use HeyReach sequence structures (connector, follow-up, message-first, InMail, warm-up) plus the full node-type and validation reference. Pairs with `campaign-launchpad`. | "build me a connector sequence", "what node types are valid in HeyReach" |
+| [`analytics-report`](skills/analytics-report/SKILL.md) | Read-only weekly/monthly performance report across all HeyReach workspaces — acceptance rate, reply rate, interested leads, org roll-up. Never creates, edits, or deletes anything. | "how are my campaigns doing", "give me this month's HeyReach numbers" |
 
 ---
 
