@@ -90,6 +90,7 @@ request against each one's description — you don't call them by name.
 | [`campaign-launchpad`](skills/campaign-launchpad/SKILL.md) | Builds and launches a complete HeyReach LinkedIn campaign end-to-end — lead-list creation, CSV import, sequence selection, schedule, senders, exclusions, pre-launch checklist, start. | "spin up a HeyReach campaign from this CSV", "launch outreach to this list" |
 | [`sequence-templates`](skills/sequence-templates/SKILL.md) | Ready-to-use HeyReach sequence structures (connector, follow-up, message-first, InMail, warm-up) plus the full node-type and validation reference. Pairs with `campaign-launchpad`. | "build me a connector sequence", "what node types are valid in HeyReach" |
 | [`analytics-report`](skills/analytics-report/SKILL.md) | Read-only weekly/monthly performance report across all HeyReach workspaces — acceptance rate, reply rate, interested leads, org roll-up. Never creates, edits, or deletes anything. | "how are my campaigns doing", "give me this month's HeyReach numbers" |
+| [`hubspot-abm-exclusion`](skills/hubspot-abm-exclusion/SKILL.md) | Checks a prospect CSV against Xoxoday's dynamic HubSpot "do not contact" list (email, LinkedIn URL, fuzzy company name, or name+company match), splitting it into OK-to-reach and excluded files with a reason per row. Requires a HubSpot Private App token. | "check this list against the exclusion list", "can I reach out to these companies" |
 
 ---
 

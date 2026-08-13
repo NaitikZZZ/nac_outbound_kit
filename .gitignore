@@ -12,6 +12,9 @@ output/
 *.xlsx
 !examples/**/*.csv
 
+# HubSpot exclusion cache (221k+ contact records, client PII, never in git)
+.claude/skills/hubspot-abm-exclusion/cache/
+
 # Python
 __pycache__/
 *.pyc
