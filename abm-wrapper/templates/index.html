@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>ABM Pipeline</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div class="topbar" id="topbar">
+    <span class="topbar-item">Run ID <code id="topbar-runid">—</code>
+      <button class="topbar-copy" id="btn-copy-runid" type="button" title="Copy run ID">Copy</button>
+    </span>
+    <span class="topbar-sep">•</span>
+    <span class="topbar-item" id="topbar-status">No run started yet</span>
+    <span class="topbar-sep">•</span>
+    <span class="topbar-item" id="topbar-last-action"></span>
+  </div>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="brand">ABM Pipeline</div>
+      <div class="brand-sub">List → clean → enrich → HubSpot + HeyReach</div>
+      <ol class="steps" id="step-list">
+        <li data-step="1" class="active"><strong>Input &amp; Normalization</strong><span>Read the list, clean names &amp; companies</span></li>
+        <li data-step="2"><strong>Domain Resolution</strong><span>Fill missing company domains</span></li>
+        <li data-step="3"><strong>Exclusion Check</strong><span>Remove existing clients</span></li>
+        <li data-step="4"><strong>People Discovery</strong><span>Find decision-makers (if no contacts)</span></li>
+        <li data-step="5"><strong>Email Reveal &amp; Validation</strong><span>Spends Apollo credits</span></li>
+        <li data-step="6"><strong>Mobile Phone</strong><span>Opt-in; needs public hosting</span></li>
+        <li data-step="7"><strong>Output Files &amp; Name</strong><span>3 files + live HeyReach push</span></li>
+        <li data-step="8"><strong>Associations</strong><span>Project / Partner / Event</span></li>
+        <li data-step="9"><strong>Preview &amp; Upload</strong><span>Push to HubSpot</span></li>
+        <li data-step="10"><strong>Copy Agent</strong><span>Segment leads, generate email &amp; LinkedIn copy</span></li>
+      </ol>
+      <div class="log-panel">
+        <div class="log-title">Activity log</div>
+        <div id="log-entries"></div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <h1>New enrichment run</h1>
+
+      <section class="card" id="card-upload">
+        <h2>1. Input &amp; Normalization</h2>
+        <p class="hint">Upload a CSV or Excel (.xlsx) file. Names/companies are cleaned automatically on upload.</p>
+        <input type="file" id="file-input" accept=".csv,.xlsx,.xlsm" />
+        <button id="btn-upload">Upload &amp; normalize</button>
+        <div class="result" id="result-step1"></div>
+      </section>
+
+      <section class="card" id="card-domain" style="display:none">
+        <h2>2. Domain Resolution</h2>
+        <p class="hint">Checks a local shared cache first, then Clearbit Autocomplete (free). Claude + grounded web search can fill the rest for anything those miss (~$0.01-0.02/lookup, needs ANTHROPIC_API_KEY in .env).</p>
+        <label><input type="checkbox" id="chk-run-domain" checked /> Run domain resolution for this run</label>
+        <label><input type="checkbox" id="chk-ai-fallback" /> Also try Claude (web search) for anything Clearbit can't resolve (small per-lookup cost)</label>
+        <button id="btn-domain">Continue</button>
+        <div class="result" id="result-step2"></div>
+      </section>
+
+      <section class="card" id="card-titles" style="display:none">
+        <h2>3a. Exclude by title (optional)</h2>
+        <p class="hint">Titles found in your list. Intern, Student, and Retired are excluded by default — uncheck any you want to keep. Check others before the DNU check runs so no bad lead moves forward.</p>
+        <input type="text" id="title-search" class="title-search" placeholder="Search titles…" />
+        <div class="title-checklist" id="title-checklist"><em>Loading titles…</em></div>
+        <button id="btn-title-exclusion">Continue to exclusion check</button>
+        <div class="result" id="result-titles"></div>
+      </section>
+
+      <section class="card" id="card-exclusion" style="display:none">
+        <h2>3b. Exclusion Check (HubSpot DNU list)</h2>
+        <p class="hint">Checks against the HubSpot "ABM EXCLSIONS - DNU" cache. Your call whether to run it this time.</p>
+        <label><input type="checkbox" id="chk-run-exclusion" checked /> Run exclusion check for this run</label>
+        <button id="btn-exclusion">Continue</button>
+        <div class="result" id="result-step3"></div>
+        <div class="workspace" id="exclusion-workspace" style="display:none">
+          <div>
+            <h3 class="ok-label">OK to reach out (<span id="ok-count">0</span>)</h3>
+            <div id="ok-table"></div>
+          </div>
+          <div>
+            <h3 class="excluded-label">Excluded (<span id="excluded-count">0</span>)</h3>
+            <div id="excluded-table"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="card" id="card-people" style="display:none">
+        <h2>4. People Discovery</h2>
+        <p class="hint">Not mandatory. Rows with a work email already are gap-filled only.</p>
+        <label><input type="checkbox" id="chk-run-people" checked /> Find people for this run</label>
+        <div id="people-options">
+          <label>Do you only need work email, or is personal email OK too?
+            <select id="email-policy">
+              <option value="personal_ok">Personal email is fine too</option>
+              <option value="work_only">Work email only — exclude rows where I can't confirm one</option>
+            </select>
+          </label>
+          <div class="filters">
+            <label>Management level <select id="seniorities" multiple></select></label>
+            <label>Employee size <select id="employee-range"><option value="">Any</option></select></label>
+            <label>Regions (comma-separated, editable) <input type="text" id="regions" /></label>
+            <label>Titles (comma-separated, editable) <input type="text" id="titles" /></label>
+          </div>
+        </div>
+        <button id="btn-people">Continue</button>
+        <div class="result" id="result-step4"></div>
+      </section>
+
+      <section class="card" id="card-email-reveal" style="display:none">
+        <h2>5. Email Reveal &amp; Validation</h2>
+        <p class="hint" id="email-reveal-estimate">Spends real Apollo credits: 1 per person Apollo finds an email for (0 if not found). Unchecked by default.</p>
+        <label><input type="checkbox" id="chk-run-email-reveal" /> Reveal work emails for this run</label>
+        <button id="btn-email-reveal">Continue</button>
+        <div class="result" id="result-step5"></div>
+      </section>
+
+      <section class="card" id="card-phone-reveal" style="display:none">
+        <h2>6. Mobile Phone</h2>
+        <p class="hint">Apollo delivers phone numbers asynchronously via webhook — this app has no public URL yet, so this step is inert until it's hosted (see README). No credits are spent while inert.</p>
+        <label><input type="checkbox" id="chk-run-phone-reveal" /> Enrich phone numbers for this run</label>
+        <button id="btn-phone-reveal">Continue</button>
+        <div class="result" id="result-step6"></div>
+      </section>
+
+      <section class="card" id="card-output-files" style="display:none">
+        <h2>7. Output Files &amp; Name</h2>
+        <p class="hint">Campaign name follows the strict naming convention. The LinkedIn file is always pushed live to HeyReach as a new list (with your explicit confirmation, shown after you generate the files).</p>
+        <div class="filters">
+          <label>Priority <select id="name-priority"></select></label>
+          <label>Team <select id="name-team"></select></label>
+          <label>Use case <select id="name-usecase"></select></label>
+          <label>Region <select id="name-region"></select></label>
+          <label>Channel <select id="name-channel"></select></label>
+          <label>POC name <input type="text" id="name-poc" placeholder="e.g. naitik" /></label>
+          <label>Start date <input type="date" id="name-startdate" /></label>
+        </div>
+        <button id="btn-output-files">Generate files</button>
+        <div class="result" id="result-step7"></div>
+        <div id="heyreach-confirm" style="display:none">
+          <p class="hint" id="heyreach-confirm-text"></p>
+          <button id="btn-push-heyreach">Confirm &amp; push to HeyReach</button>
+        </div>
+        <div class="result" id="result-heyreach"></div>
+      </section>
+
+      <section class="card" id="card-associations" style="display:none">
+        <h2>8. Associations</h2>
+        <p class="hint">Read-only — pick what to associate the upload with, or skip entirely.</p>
+        <label><input type="checkbox" id="chk-skip-associations" /> Skip associations, just upload the data</label>
+        <div class="filters" id="association-pickers">
+          <label>Project <select id="assoc-project"><option value="">None</option></select></label>
+          <label>Partner <select id="assoc-partner"><option value="">None</option></select></label>
+          <label>Event <select id="assoc-event"><option value="">None</option></select></label>
+        </div>
+        <button id="btn-associations">Continue to upload</button>
+      </section>
+
+      <section class="card" id="card-upload-ok" style="display:none">
+        <h2>9a. Preview &amp; Upload — OK contacts</h2>
+        <div class="result" id="result-upload-ok-preview"></div>
+        <button id="btn-upload-ok">Confirm &amp; upload to HubSpot</button>
+        <div class="result" id="result-upload-ok"></div>
+      </section>
+
+      <section class="card" id="card-upload-farming" style="display:none">
+        <h2>9b. Preview &amp; Upload — Excluded contacts (farming)</h2>
+        <p class="hint">Only excluded rows that have an email are uploaded. No enrichment is ever run on this track.</p>
+        <div class="result" id="result-upload-farming-preview"></div>
+        <button id="btn-upload-farming">Confirm &amp; upload to HubSpot</button>
+        <div class="result" id="result-upload-farming"></div>
+      </section>
+
+      <section class="card" id="card-copy-agent" style="display:none">
+        <h2>10. Copy Agent</h2>
+        <p class="hint" id="copy-agent-hint">Segments the uploaded leads by persona (reusing this repo's own ICP title taxonomy) and generates tailored email + LinkedIn copy per segment via Claude.</p>
+        <label><input type="checkbox" id="chk-run-copy-agent" /> Generate campaign copy for this run</label>
+        <button id="btn-copy-agent">Generate copy</button>
+        <div class="result" id="result-step10"></div>
+        <div id="copy-agent-segments"></div>
+      </section>
+
+      <section class="card" id="card-downloads" style="display:none">
+        <h2>Downloads (current state)</h2>
+        <a id="dl-ok" href="#">OK-to-reach-out CSV</a>
+        <a id="dl-excluded" href="#">Excluded CSV</a>
+      </section>
+    </main>
+  </div>
+  <script src="/static/app.js"></script>
+</body>
+</html>

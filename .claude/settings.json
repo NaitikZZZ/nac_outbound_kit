@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "mcp__42064586-ead6-447a-b800-72aeb8085e38__list_sequences",
+      "mcp__42064586-ead6-447a-b800-72aeb8085e38__get_email_list",
+      "mcp__42064586-ead6-447a-b800-72aeb8085e38__list_sequence_steps",
+      "mcp__42064586-ead6-447a-b800-72aeb8085e38__get_sequence_stats",
+      "mcp__42064586-ead6-447a-b800-72aeb8085e38__get_consolidated_stats",
+      "mcp__42064586-ead6-447a-b800-72aeb8085e38__list_email_accounts",
+      "mcp__42064586-ead6-447a-b800-72aeb8085e38__list_fields",
+      "Bash(curl -s \"https://open-api.saleshandy.com/v1/prospects*\")"
+    ]
+  }
+}

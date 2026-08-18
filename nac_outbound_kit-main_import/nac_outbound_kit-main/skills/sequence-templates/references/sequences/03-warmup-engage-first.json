@@ -1,0 +1,24 @@
+{
+  "nodeType": "VIEW_PROFILE",
+  "unconditionalNode": {
+    "nodeType": "LIKE_POST",
+    "actionDelay": 1, "actionDelayUnit": "DAY",
+    "payload": { "reactBefore": "WEEK2", "skipDelayIfCannotLike": true },
+    "unconditionalNode": {
+      "nodeType": "CONNECTION_REQUEST",
+      "actionDelay": 1, "actionDelayUnit": "DAY",
+      "payload": { "messages": [] },
+      "conditionalNode": {
+        "nodeType": "MESSAGE",
+        "actionDelay": 1, "actionDelayUnit": "DAY",
+        "payload": {
+          "messages": ["Appreciate the connect, {FIRST_NAME}! Been following what {COMPANY} is doing — quick question on <topic>: <question>?"],
+          "fallbackMessage": "Appreciate the connect! Quick question on <topic>: <question>?"
+        },
+        "conditionalNode": { "nodeType": "END", "actionDelay": 3, "actionDelayUnit": "HOUR" },
+        "unconditionalNode": { "nodeType": "END", "actionDelay": 3, "actionDelayUnit": "DAY" }
+      },
+      "unconditionalNode": { "nodeType": "END", "actionDelay": 7, "actionDelayUnit": "DAY" }
+    }
+  }
+}

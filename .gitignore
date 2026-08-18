@@ -1,7 +1,9 @@
 .env
-outputs/*.csv
-outputs/*.md
+outputs/*
 !outputs/.gitkeep
+!outputs/*.py
 __pycache__/
 *.pyc
 .DS_Store
+.claude/skills/hubspot-abm-exclusion/cache/*.csv
+.claude/skills/hubspot-abm-exclusion/cache/*.json
