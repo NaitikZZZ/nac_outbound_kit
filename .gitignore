@@ -1,9 +1,52 @@
+# Environment / secrets
 .env
-outputs/*
+.env.local
+.env.*.local
+*.key
+*.pem
+
+# Output data (lead data stays local, never in git)
+outputs/
+output/
 !outputs/.gitkeep
-!outputs/*.py
+*.csv
+*.xlsx
+!examples/**/*.csv
+
+# HubSpot exclusion cache (221k+ contact records, client PII, never in git)
+.claude/skills/hubspot-abm-exclusion/cache/
+
+# Python
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# OS
 .DS_Store
-.claude/skills/hubspot-abm-exclusion/cache/*.csv
-.claude/skills/hubspot-abm-exclusion/cache/*.json
+Thumbs.db
+*.swp
+*~
+
+# IDE
+.vscode/
+.idea/
+*.sublime-*
+
+# Claude Code
+.claude/sessions/
+.claude/projects/
+
+# Logs
+*.log
+logs/
+
+# Temp files
+tmp/
+temp/
+*.tmp

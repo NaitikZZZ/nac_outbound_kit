@@ -1,0 +1,62 @@
+# Smartlead Campaign Default Settings (Hardcoded v2)
+# Apply these settings to EVERY new campaign created via 06_smartlead_create_campaign.py
+# Updated: 2026-06-19
+
+scheduling:
+  timezone: "Asia/Calcutta"
+  campaign_start_date: "next_day"  # Always next day; user can override manually
+  active_days:
+    - Monday
+    - Tuesday
+    - Wednesday
+    - Thursday
+    - Friday
+  sending_window:
+    start_hour: 9
+    end_hour: 18
+  sending_interval_minutes: 20
+  daily_lead_limit: 200
+
+delivery_optimization:
+  track_email_opens: false  # Toggle ON (don't track)
+  track_link_clicks: false  # Toggle ON (don't track)
+  esp_matching: true        # Toggle ON
+  private_infrastructure: "single_server"  # Select All from dropdown
+
+ai_automation:
+  smartlead_ai_auto_categorize: true
+  ai_categories:
+    - "Information Request"
+    - "Out Of Office"
+    - "Wrong Person"
+    - "Interested"
+    - "Meeting Request"
+    - "Not Interested"
+    - "Connected to another POC"
+    - "Uncategorizable by AI"
+    - "Competitor"
+    - "Sender Originated Bounce"
+
+ooo_handling:
+  exclude_ooo_from_metrics: true
+  auto_restart_after_ooo: true
+  auto_restart_after_delay: true
+  days_to_wait_after_ooo: 7
+
+notes: |
+  These settings are designed for Xoxoday Plum/Empuls/Compass/Loyalife cold email campaigns.
+
+  Fields that are API-settable (implement in 06_smartlead_create_campaign.py):
+  - timezone
+  - campaign_start_date
+  - active_days
+  - sending_window
+  - sending_interval_minutes
+  - daily_lead_limit
+
+  Fields that are UI-only (apply manually in Smartlead dashboard):
+  - delivery_optimization: track_email_opens, track_link_clicks, esp_matching, private_infrastructure
+  - ai_automation: smartlead_ai_auto_categorize, ai_categories
+  - ooo_handling: exclude_ooo_from_metrics, auto_restart_after_ooo, auto_restart_after_delay, days_to_wait_after_ooo
+
+  To-do: Coordinate with Smartlead support to expose UI-only fields via API.
