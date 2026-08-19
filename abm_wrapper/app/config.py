@@ -14,7 +14,7 @@ ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 
 # Apollo's phone reveal is asynchronous -- it POSTs the result to a webhook URL
 # rather than returning it in the response. Empty until this app is actually
-# hosted somewhere with a public URL (see abm-wrapper/README.md); Step 6
+# hosted somewhere with a public URL (see abm_wrapper/README.md); Step 6
 # degrades gracefully when this is unset rather than making a call Apollo
 # can never deliver a result for.
 PUBLIC_BASE_URL = os.environ.get("ABM_WRAPPER_PUBLIC_URL", "")

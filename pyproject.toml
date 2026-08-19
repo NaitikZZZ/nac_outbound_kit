@@ -1,0 +1,2 @@
+[tool.vercel]
+entrypoint = "abm_wrapper.app.main:app"

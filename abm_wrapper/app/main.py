@@ -7,8 +7,8 @@ from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from . import apollo_taxonomy, copy_agent, db, naming, runs, skills_bridge
-from .config import ANTHROPIC_API_KEY
+from . import apollo_taxonomy, copy_agent, db, exclusion_cache_refresh, naming, runs, skills_bridge
+from .config import ANTHROPIC_API_KEY, HUBSPOT_API_KEY
 from .steps import step1_input_normalization as step1
 from .steps import step2_domain_resolution as step2
 from .steps import step3_exclusion_check as step3
@@ -107,6 +107,7 @@ async def upload(run_id: str, file: UploadFile = File(...)):
     run.excluded_rows = []
     run.step_results["step1"] = {k: v for k, v in result.items() if k != "rows"}
     run.add_log(f"Upload & normalize: {result['row_count']} rows", t.ms)
+    runs.save(run)
     return {"preview": result["rows"][:20], **run.step_results["step1"]}
 
 
@@ -120,11 +121,13 @@ def domain_resolution(run_id: str, run_step: bool = Form(...), use_ai_fallback: 
     if not run_step:
         run.step_results["step2"] = {"skipped": True, "reason": "Skipped by user choice"}
         run.add_log("Domain resolution: skipped by user", 0)
+        runs.save(run)
         return run.step_results["step2"]
 
     if step2.should_skip(run.headers, run.ok_rows):
         run.step_results["step2"] = {"skipped": True, "reason": "Domain/Website already filled on every row"}
         run.add_log("Domain resolution: auto-skipped (already filled)", 0)
+        runs.save(run)
         return run.step_results["step2"]
 
     with runs.Timer() as t:
@@ -137,6 +140,7 @@ def domain_resolution(run_id: str, run_step: bool = Form(...), use_ai_fallback: 
         f"Domain resolution: {result['newly_resolved']} resolved of {result['row_count']} rows",
         t.ms,
     )
+    runs.save(run)
     return {"preview": result["rows"][:20], **run.step_results["step2"]}
 
 
@@ -159,6 +163,7 @@ def title_exclusion(run_id: str, excluded_titles: list[str] = Form(default=[])):
     run.ok_rows = kept
     run.excluded_rows = run.excluded_rows + excluded
     run.add_log(f"Title exclusion: {len(excluded)} rows excluded", t.ms)
+    runs.save(run)
     return {"excluded_count": len(excluded), "remaining_ok": len(kept)}
 
 
@@ -178,6 +183,7 @@ def exclusion_check(run_id: str, run_check: bool = Form(...)):
         if result["ran"] else "DNU exclusion check: skipped by user",
         t.ms,
     )
+    runs.save(run)
     return {
         "preview_ok": run.ok_rows[:20],
         "preview_excluded": run.excluded_rows[:20],
@@ -208,11 +214,13 @@ def people_discovery(run_id: str, run_step: bool = Form(...), work_email_only: b
     if not run_step:
         run.step_results["step4"] = {"skipped": True, "reason": "Skipped by user choice"}
         run.add_log("People discovery: skipped by user", 0)
+        runs.save(run)
         return run.step_results["step4"]
 
     if step4.should_skip_all(run.headers, run.ok_rows, cols):
         run.step_results["step4"] = {"skipped": True, "reason": "Email already filled on every row"}
         run.add_log("People discovery: auto-skipped (email already filled)", 0)
+        runs.save(run)
         return run.step_results["step4"]
 
     employee_ranges = [employee_range] if employee_range else None
@@ -236,6 +244,7 @@ def people_discovery(run_id: str, run_step: bool = Form(...), work_email_only: b
         f"{result['counts']['excluded_personal_only']} excluded (personal-only)",
         t.ms,
     )
+    runs.save(run)
     return {"preview": result["rows"][:20], **run.step_results["step4"]}
 
 
@@ -301,6 +310,7 @@ def email_reveal(run_id: str, run_step: bool = Form(...)):
     if not run_step:
         run.step_results["step5"] = {"skipped": True, "reason": "Skipped by user choice"}
         run.add_log("Email reveal: skipped by user", 0)
+        runs.save(run)
         return run.step_results["step5"]
 
     with runs.Timer() as t:
@@ -310,6 +320,7 @@ def email_reveal(run_id: str, run_step: bool = Form(...)):
     run.step_results["step5"] = {k: v for k, v in result.items() if k != "rows"}
     run.step_results["step5"]["skipped"] = False
     run.add_log(f"Email reveal: {result['counts']['revealed']} revealed (real Apollo credits spent)", t.ms)
+    runs.save(run)
     return {"preview": result["rows"][:20], **run.step_results["step5"]}
 
 
@@ -322,6 +333,7 @@ def phone_reveal(run_id: str, run_step: bool = Form(...)):
     if not run_step:
         run.step_results["step6"] = {"skipped": True, "reason": "Skipped by user choice -- phone enrichment is opt-in every run"}
         run.add_log("Phone reveal: skipped by user", 0)
+        runs.save(run)
         return run.step_results["step6"]
 
     with runs.Timer() as t:
@@ -331,6 +343,7 @@ def phone_reveal(run_id: str, run_step: bool = Form(...)):
     run.step_results["step6"] = {k: v for k, v in result.items() if k != "rows"}
     run.step_results["step6"]["skipped"] = False
     run.add_log(f"Phone reveal: {result.get('pending', 0)} pending / {result.get('attempted', 0)} attempted", t.ms)
+    runs.save(run)
     return {"preview": result["rows"][:20], **run.step_results["step6"]}
 
 
@@ -360,6 +373,7 @@ def output_files(run_id: str, priority: str = Form(...), team: str = Form(...), 
     run.ok_rows = result["rows"]
     run.step_results["step7"] = {k: v for k, v in result.items() if k not in ("rows", "heyreach_leads")}
     run.add_log(f"Output files: {result['counts']}", t.ms)
+    runs.save(run)
     return run.step_results["step7"]
 
 
@@ -377,6 +391,7 @@ def push_heyreach(run_id: str, confirm: bool = Form(...)):
         push_result = step7.push_to_heyreach(run.campaign_name, result["heyreach_leads"])
     run.step_results["step7_heyreach"] = push_result
     run.add_log(f"HeyReach push: {push_result.get('added', 0)} added, {push_result.get('failed', 0)} failed", t.ms)
+    runs.save(run)
     return push_result
 
 
@@ -387,6 +402,7 @@ def associations(run_id: str):
         result = step8.run()
     run.step_results["step8"] = result
     run.add_log(f"Associations: {len(result['projects'])} projects, {len(result['partners'])} partners, {len(result['events'])} events", t.ms)
+    runs.save(run)
     return result
 
 
@@ -427,6 +443,7 @@ def upload_execute(run_id: str, track: str = Form(...), confirm: bool = Form(...
             raise HTTPException(404, "unknown track")
     run.step_results[f"step9_{track}"] = result
     run.add_log(f"HubSpot upload ({track}): {result.get('upserted_count', 0)} contacts to '{result['campaign_name']}'", t.ms)
+    runs.save(run)
     return result
 
 
@@ -464,11 +481,13 @@ def copy_agent_step(run_id: str, run_step: bool = Form(...)):
     if not run_step:
         run.step_results["step10"] = {"skipped": True, "reason": "Skipped by user choice"}
         run.add_log("Copy Agent: skipped by user", 0)
+        runs.save(run)
         return run.step_results["step10"]
 
     if not ANTHROPIC_API_KEY:
         run.step_results["step10"] = {"skipped": True, "reason": "ANTHROPIC_API_KEY not set -- Copy Agent skipped"}
         run.add_log("Copy Agent: ANTHROPIC_API_KEY not set - Copy Agent skipped", 0)
+        runs.save(run)
         return run.step_results["step10"]
 
     with runs.Timer() as t:
@@ -480,6 +499,7 @@ def copy_agent_step(run_id: str, run_step: bool = Form(...)):
         f"{sum(s['lead_count'] for s in result['segments'])} of {result['total_leads']} lead(s)",
         t.ms,
     )
+    runs.save(run)
     return result
 
 
@@ -495,6 +515,23 @@ def download_copy_agent(run_id: str):
         media_type="text/markdown",
         headers={"Content-Disposition": f'attachment; filename="{run_id}-campaign-copy.md"'},
     )
+
+
+@app.post("/api/cron/refresh-exclusion-cache")
+def refresh_exclusion_cache():
+    """Called on a schedule by Vercel Cron (see vercel.json) once deployed.
+    Not tied to any single run -- refreshes the shared exclusion cache that
+    every run's Step 3 reads from. Does as much work as fits in one
+    invocation's time budget and reports whether a full pass completed;
+    Cron calling this repeatedly makes incremental progress either way.
+    No-ops with a clear reason if Redis isn't configured (local dev) --
+    local dev keeps using the local CSV file directly, nothing to refresh."""
+    if not HUBSPOT_API_KEY:
+        raise HTTPException(400, "HUBSPOT_API_KEY is not set -- cannot refresh the exclusion cache.")
+    try:
+        return exclusion_cache_refresh.refresh(HUBSPOT_API_KEY)
+    except RuntimeError as exc:
+        return {"skipped": True, "reason": str(exc)}
 
 
 def _get_run_or_404(run_id):

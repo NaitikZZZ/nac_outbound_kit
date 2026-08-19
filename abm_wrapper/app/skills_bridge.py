@@ -140,8 +140,37 @@ def normalize_rows(headers, rows, strip_the=False, strip_tagline=False, strip_ge
 
 
 def load_exclusion_cache(cache_path=None):
+    """Local dev (or an explicit `cache_path`): reads the local CSV exactly
+    as before. Deployed with Redis configured: reads the Redis-cached pull
+    (see exclusion_cache_refresh.py) instead, since the local CSV is
+    gitignored PII that doesn't exist in the deployed source at all --
+    falls back to the local file only if a refresh has never completed."""
+    if cache_path is None:
+        from . import exclusion_cache_refresh, kv
+        if kv.available():
+            rows, _meta = exclusion_cache_refresh.load_current_cache_rows()
+            if rows is not None:
+                return _load_cache_from_rows(rows)
     path = str(cache_path or EXCLUSION_CACHE_PATH)
     return _check_exclusions.load_cache(path)
+
+
+def _load_cache_from_rows(rows):
+    """Writes Redis-sourced rows to a scratch CSV and hands it to
+    check_exclusions.py's own load_cache() unchanged, rather than
+    reimplementing its indexing logic here."""
+    import csv
+    import tempfile
+
+    if not rows:
+        return {"by_email": {}, "by_linkedin": {}, "by_company_exact": {}, "unique_company_buckets": {}, "by_name": {}}
+    fieldnames = list(rows[0].keys())
+    with tempfile.NamedTemporaryFile("w", suffix=".csv", delete=False, newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+        tmp_path = f.name
+    return _check_exclusions.load_cache(tmp_path)
 
 
 def check_exclusions(headers, rows, cache_idx):

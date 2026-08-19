@@ -5,3 +5,11 @@ pyyaml>=6.0.0
 openpyxl>=3.1.0
 reportlab>=4.0.0
 python-docx>=1.0.0
+
+# abm_wrapper/ (Vercel deployment reads this root-level file, not
+# abm_wrapper/requirements.txt -- see pyproject.toml's [tool.vercel] entrypoint)
+fastapi>=0.115.0
+uvicorn>=0.32.0
+python-multipart>=0.0.20
+anthropic>=0.122.0
+upstash-redis>=1.2.0

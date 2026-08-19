@@ -8,7 +8,7 @@ full design.
 ## Run it
 
 ```bash
-cd abm-wrapper
+cd abm_wrapper
 pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8000
 ```

@@ -1,0 +1,14 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "abm_wrapper/app/main.py": {
+      "maxDuration": 60
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/refresh-exclusion-cache",
+      "schedule": "0 3 * * *"
+    }
+  ]
+}
