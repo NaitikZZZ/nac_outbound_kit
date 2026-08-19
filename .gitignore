@@ -50,3 +50,10 @@ logs/
 tmp/
 temp/
 *.tmp
+
+# wrapper/ (real ABM Wrapper backend+frontend, pulled from NaitikZZZ/smartlead-kit)
+wrapper/backend/.venv/
+wrapper/backend/runs/
+wrapper/backend/cache/
+wrapper/frontend/node_modules/
+wrapper/frontend/dist/

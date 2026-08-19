@@ -4,6 +4,19 @@
 
 ---
 
+## ABM Wrapper app
+
+The real, actively-deployed "Xoxoday ABM Wrapper" tool lives in `wrapper/` (`wrapper/backend` - FastAPI, `wrapper/frontend` - React/Vite). Its source of truth is [NaitikZZZ/smartlead-kit](https://github.com/NaitikZZZ/smartlead-kit) on GitHub, deployed live at `abm-wrapper-backend.vercel.app`; the copy under `wrapper/` here was pulled in for local development and reference. Run it locally with:
+
+```bash
+cd wrapper/backend && .venv/bin/python3 -m uvicorn app.main:app --port 8731 --app-dir .
+cd wrapper/frontend && npm run dev -- --port 5173
+```
+
+`abm_wrapper/` (this repo's own FastAPI+vanilla-JS rebuild, built before the real source was found) is kept alongside for reference but is superseded by `wrapper/` - prefer `wrapper/` for any real ABM Wrapper work.
+
+---
+
 ## What You Are
 
 You are the outbound automation agent for the Xoxoday GTM and Outbound teams. When a user opens this project, they want to take a raw list of leads, enrich them, segment them, write copy, and launch campaigns on Smartlead and HeyReach. You do the end-to-end execution.
