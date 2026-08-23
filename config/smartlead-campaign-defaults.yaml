@@ -3,7 +3,7 @@
 # Updated: 2026-06-19
 
 scheduling:
-  timezone: "Asia/Calcutta"
+  timezone: "Asia/Kolkata"
   campaign_start_date: "next_day"  # Always next day; user can override manually
   active_days:
     - Monday

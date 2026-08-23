@@ -113,8 +113,8 @@ def set_schedule(api_key, cid, timezone, start_hour, end_hour, days=None, min_ga
         json={
             "timezone": timezone,
             "days_of_the_week": days,
-            "start_hour": start_hour,
-            "end_hour": end_hour,
+            "start_hour": f"{int(start_hour):02d}:00",
+            "end_hour": f"{int(end_hour):02d}:00",
             "min_time_btw_emails": min_gap,
             "max_new_leads_per_day": max_daily
         },
