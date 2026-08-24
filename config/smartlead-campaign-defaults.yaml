@@ -45,7 +45,7 @@ ooo_handling:
   days_to_wait_after_ooo: 7
 
 hubspot_integration:
-  enabled: null  # INTENTIONALLY UNSET - see notes below, conflicts with CLAUDE.md's "HubSpot is read-only" rule. Do not set true without resolving that first.
+  enabled: true  # Default ON for every campaign. Carve-out to CLAUDE.md's "HubSpot is read-only" rule, scoped ONLY to this toggle - see notes below.
 
 notes: |
   These settings are designed for Xoxoday Plum/Empuls/Compass/Loyalife cold email campaigns.
@@ -65,10 +65,11 @@ notes: |
   - ai_automation: smartlead_ai_auto_categorize, ai_categories (select all, including "Do Not Contact")
   - ooo_handling: exclude_ooo_from_metrics, auto_restart_after_ooo, auto_restart_after_delay, days_to_wait_after_ooo
 
-  hubspot_integration is deliberately left unset. Enabling "HubSpot Integration" in a Smartlead
-  campaign syncs email activity back into HubSpot, i.e. it writes to HubSpot. CLAUDE.md's Critical
-  Rule #2 says HubSpot is read-only and nothing should ever write/update/create there. Requested as
-  a standing default on 2026-08-25 but held back pending explicit confirmation that this rule should
-  be relaxed for this one integration path.
+  hubspot_integration.enabled: true is a deliberate, scoped exception to CLAUDE.md's Critical Rule #2
+  ("HubSpot is read-only"), confirmed by the user on 2026-08-25. Enabling "HubSpot Integration" inside
+  a Smartlead campaign is the ONLY write path to HubSpot that is allowed. Every other write/update/
+  create action against HubSpot (direct API calls, HubSpot MCP tools, manual record edits, etc.)
+  remains strictly prohibited. Do not treat this exception as license to loosen the read-only rule
+  anywhere else.
 
   To-do: Coordinate with Smartlead support to expose remaining UI-only fields via API.

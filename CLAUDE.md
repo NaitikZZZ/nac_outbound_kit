@@ -38,7 +38,7 @@ Full product details in `reference/xoxoday-products.md`.
 ## Critical Rules
 
 1. **Never display API keys** in chat output, files, or code blocks. Load from `.env` silently.
-2. **HubSpot is read-only.** Never write, update, or create anything in HubSpot. Read context only.
+2. **HubSpot is read-only.** Never write, update, or create anything in HubSpot. Read context only. **One scoped exception:** the "HubSpot Integration" toggle inside a Smartlead campaign (which syncs campaign activity into HubSpot) is enabled by default per `config/smartlead-campaign-defaults.yaml`, confirmed by the user on 2026-08-25. This exception applies ONLY to that toggle. Every other write path to HubSpot (direct API, MCP tools, manual edits) stays prohibited.
 3. **No em dashes or en dashes** in any output (emails, copy, docs). Use hyphens, commas, or rewrite.
 4. **Campaign names follow the official convention** (see `docs/campaign-naming-convention.md`). Always.
 5. **Ask before running enrichment** if the lead count is over 500 (credit cost check).
@@ -205,7 +205,7 @@ Examples:
 - Private infrastructure: all 4 servers selected (UI-only, set by hand each time)
 - AI lead categorization: ON, with every category selected including "Do Not Contact" (UI-only)
 - OOO handling: ignore OOO in reply %, auto-restart OOO leads after they return, 7-day re-activation delay (UI-only)
-- HubSpot integration toggle: **left unset, do not enable.** Enabling it makes Smartlead write campaign activity into HubSpot, which conflicts with Critical Rule #2 (HubSpot is read-only). Get that conflict explicitly resolved before ever turning this on, even if asked to set it as a default.
+- HubSpot integration toggle: **ON by default** (UI-only). This is the one confirmed, scoped exception to Critical Rule #2 above; it applies to this toggle only, nowhere else.
 
 ---
 
