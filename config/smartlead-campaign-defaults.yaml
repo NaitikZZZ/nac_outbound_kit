@@ -1,6 +1,6 @@
 # Smartlead Campaign Default Settings (Hardcoded v2)
 # Apply these settings to EVERY new campaign created via 06_smartlead_create_campaign.py
-# Updated: 2026-06-19
+# Updated: 2026-08-25
 
 scheduling:
   timezone: "Asia/Kolkata"
@@ -18,14 +18,15 @@ scheduling:
   daily_lead_limit: 200
 
 delivery_optimization:
-  track_email_opens: false  # Toggle ON (don't track)
-  track_link_clicks: false  # Toggle ON (don't track)
+  track_email_opens: false  # DON'T track (API-settable: track_settings: ["DONT_EMAIL_OPEN"])
+  track_link_clicks: false  # DON'T track (API-settable: track_settings: ["DONT_LINK_CLICK"])
   esp_matching: true        # Toggle ON
-  private_infrastructure: "single_server"  # Select All from dropdown
+  private_infrastructure: "all_4_servers"  # Select ALL 4 servers from dropdown, every campaign
 
 ai_automation:
   smartlead_ai_auto_categorize: true
   ai_categories:
+    - "Do Not Contact"
     - "Information Request"
     - "Out Of Office"
     - "Wrong Person"
@@ -38,25 +39,36 @@ ai_automation:
     - "Sender Originated Bounce"
 
 ooo_handling:
-  exclude_ooo_from_metrics: true
-  auto_restart_after_ooo: true
-  auto_restart_after_delay: true
+  exclude_ooo_from_metrics: true       # "Ignore the auto-categorised OOO reply from the reply %"
+  auto_restart_after_ooo: true         # "Automatically restart ai-categorised OOO when lead returns"
+  auto_restart_after_delay: true       # "Re-activate auto-categorised OOO lead after a delay (deprecated)"
   days_to_wait_after_ooo: 7
+
+hubspot_integration:
+  enabled: null  # INTENTIONALLY UNSET - see notes below, conflicts with CLAUDE.md's "HubSpot is read-only" rule. Do not set true without resolving that first.
 
 notes: |
   These settings are designed for Xoxoday Plum/Empuls/Compass/Loyalife cold email campaigns.
 
-  Fields that are API-settable (implement in 06_smartlead_create_campaign.py):
+  Fields that are API-settable (implemented in 06_smartlead_create_campaign.py, POST /campaigns/{id}/settings):
   - timezone
   - campaign_start_date
   - active_days
   - sending_window
   - sending_interval_minutes
   - daily_lead_limit
+  - track_email_opens / track_link_clicks (as track_settings: ["DONT_EMAIL_OPEN", "DONT_LINK_CLICK"])
 
-  Fields that are UI-only (apply manually in Smartlead dashboard):
-  - delivery_optimization: track_email_opens, track_link_clicks, esp_matching, private_infrastructure
-  - ai_automation: smartlead_ai_auto_categorize, ai_categories
+  Fields that are UI-only (no documented Smartlead API field; must be set by hand in the dashboard
+  on every new campaign until Smartlead exposes them via API):
+  - delivery_optimization: esp_matching, private_infrastructure (select all 4 servers)
+  - ai_automation: smartlead_ai_auto_categorize, ai_categories (select all, including "Do Not Contact")
   - ooo_handling: exclude_ooo_from_metrics, auto_restart_after_ooo, auto_restart_after_delay, days_to_wait_after_ooo
 
-  To-do: Coordinate with Smartlead support to expose UI-only fields via API.
+  hubspot_integration is deliberately left unset. Enabling "HubSpot Integration" in a Smartlead
+  campaign syncs email activity back into HubSpot, i.e. it writes to HubSpot. CLAUDE.md's Critical
+  Rule #2 says HubSpot is read-only and nothing should ever write/update/create there. Requested as
+  a standing default on 2026-08-25 but held back pending explicit confirmation that this rule should
+  be relaxed for this one integration path.
+
+  To-do: Coordinate with Smartlead support to expose remaining UI-only fields via API.

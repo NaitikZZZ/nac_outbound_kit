@@ -127,6 +127,7 @@ def configure_settings(api_key, cid):
     resp = requests.post(
         f"{BASE}/campaigns/{cid}/settings?api_key={api_key}",
         json={
+            "track_settings": ["DONT_EMAIL_OPEN", "DONT_LINK_CLICK"],
             "stop_lead_settings": "REPLY_TO_AN_EMAIL",
             "send_as_plain_text": False,
             "follow_up_percentage": 100,

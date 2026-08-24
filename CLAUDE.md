@@ -198,6 +198,14 @@ Examples:
 - `stop_lead_settings`: `REPLY_TO_AN_EMAIL`
 - `follow_up_percentage`: 100
 - `add_unsubscribe_tag`: true
+- `track_settings`: `["DONT_EMAIL_OPEN", "DONT_LINK_CLICK"]` - don't track opens or clicks, on every campaign
+
+**Standing defaults for every campaign (full list, incl. UI-only fields not settable via API): `config/smartlead-campaign-defaults.yaml`.** In short, every new campaign should have:
+- Email opens and link clicks: OFF (API-settable, see `track_settings` above)
+- Private infrastructure: all 4 servers selected (UI-only, set by hand each time)
+- AI lead categorization: ON, with every category selected including "Do Not Contact" (UI-only)
+- OOO handling: ignore OOO in reply %, auto-restart OOO leads after they return, 7-day re-activation delay (UI-only)
+- HubSpot integration toggle: **left unset, do not enable.** Enabling it makes Smartlead write campaign activity into HubSpot, which conflicts with Critical Rule #2 (HubSpot is read-only). Get that conflict explicitly resolved before ever turning this on, even if asked to set it as a default.
 
 ---
 
@@ -208,7 +216,7 @@ Examples:
 {"profileUrl": "https://www.linkedin.com/in/...", "firstName": "...", "lastName": "..."}
 ```
 
-**Merge tags:** `{{first_name}}`, `{{last_name}}`, `{{company_name}}`, `{{position}}`
+**Merge tags:** `{FIRST_NAME}`, `{COMPANY}` — single curly braces, uppercase. This is different from Smartlead's `{{first_name}}` style; do not reuse Smartlead's format here, it renders as literal unrendered text in HeyReach. Confirmed live 2026-08-24; only these two tags are verified, treat any other (last name, position) as unconfirmed until seen working.
 
 **Rate limits:**
 - 100 leads per `add_leads_to_list_v2` call
