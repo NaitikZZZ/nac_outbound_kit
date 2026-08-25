@@ -73,3 +73,4 @@ notes: |
   anywhere else.
 
   To-do: Coordinate with Smartlead support to expose remaining UI-only fields via API.
+  Full feature-request list, ready to send to Smartlead support: docs/smartlead-api-gaps.md
