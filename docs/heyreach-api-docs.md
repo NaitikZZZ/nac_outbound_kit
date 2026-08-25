@@ -59,26 +59,20 @@ Response: {"addedLeadsCount": 100, "updatedLeadsCount": 0, "failedLeadsCount": 0
 
 ## Merge Tags
 
-HeyReach supports these tags inside DM and InMail messages:
+**Correct syntax confirmed live (2026-08-24): single curly braces, uppercase.** The double-brace lowercase style below (`{{first_name}}`) is what Smartlead uses, not HeyReach — pasting it into a HeyReach DM/InMail leaves the literal text unrendered. Confirmed by comparing a campaign's `GetCampaignSequence` output before and after a manual fix in the HeyReach UI.
 
 | Tag | Meaning |
 |-----|---------|
-| `{{first_name}}` | Prospect first name |
-| `{{last_name}}` | Prospect last name |
-| `{{company_name}}` | Prospect company |
-| `{{position}}` | Prospect job title |
+| `{FIRST_NAME}` | Prospect first name |
+| `{COMPANY}` | Prospect company (not `{COMPANY_NAME}`) |
+
+Only these two were confirmed live so far. Treat any other tag (last name, position) as unverified until seen working in a real campaign — don't assume it follows the same pattern without checking.
 
 ---
 
-## Recommended Standard Cadence (5 Steps)
+## Recommended Standard Cadence
 
-| Day | Step | Configuration |
-|-----|------|---------------|
-| D1 | Visit Profile | Automatic, no message |
-| D2 | Like Post | Most recent post |
-| D4 | Send Connection Request | NO note - higher acceptance rates |
-| D7 | DM (if connected) or InMail (if not) | Main pitch message |
-| D10 | Follow-up DM | Value-add, asset share, breakup |
+**Superseded by `docs/heyreach-default-workflow.md`** (extracted from a live campaign, 2026-08-25): a `CHECK_IS_CONNECTION` branch, profile visit + like + no-note connect for not-yet-connected leads, then a 4-message DM sequence (with a second profile visit before the last DM) for both branches, stop-on-reply on every message. See that doc for the full flowchart and delays.
 
 ---
 

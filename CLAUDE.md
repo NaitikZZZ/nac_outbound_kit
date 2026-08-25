@@ -114,8 +114,9 @@ Use `templates/email-sequences/` for Smartlead and `templates/linkedin-sequences
 - Merge tags: `{{first_name}}`, `{{company_name}}`, `{{sender_first_name}}`
 
 **HeyReach LinkedIn structure:**
-- 5 steps: Day 1 profile visit, Day 2 like post, Day 4 connect (no note), Day 7 DM, Day 10 follow-up DM
-- Merge tags: `{{first_name}}`, `{{last_name}}`, `{{company_name}}`, `{{position}}`
+- Default workflow: `docs/heyreach-default-workflow.md` (extracted from a live campaign, 2026-08-25). A `CHECK_IS_CONNECTION` branch splits leads immediately; not-yet-connected leads get profile visit, like, then a no-note connection request; both branches then run the same 4-message DM sequence (with a second profile visit before the final DM); stop-on-reply is enforced on every message individually, not just as a campaign toggle.
+- Message count is not fixed by the structure. Default suggestion is 4 DMs, but always ask the user how many they want before writing copy.
+- Merge tags: `{FIRST_NAME}`, `{COMPANY}` - single curly braces, uppercase, see HeyReach Details below. Do not use Smartlead's `{{first_name}}` style here.
 
 ### Step 8: Create Smartlead campaign
 Use `scripts/06_smartlead_create_campaign.py` or the Smartlead MCP. Sequence:

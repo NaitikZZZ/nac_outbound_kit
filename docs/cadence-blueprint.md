@@ -38,11 +38,7 @@
 - Timezone-aware scheduling per lead
 
 ### HeyReach handles
-- Profile visit (D1)
-- Post like (D2)
-- Connection request (D4)
-- DM / InMail (D7)
-- Follow-up DM (D10)
+See `docs/heyreach-default-workflow.md` for the actual default structure (extracted from a live campaign, 2026-08-25): a `CHECK_IS_CONNECTION` branch splits leads immediately, not-yet-connected leads get profile visit, like, then a no-note connection request, then both branches run the same 4-message DM sequence (with a second profile visit before the final DM), stop-on-reply enforced per message. The D1/D2/D4/D7/D10 row above is the simplified summary, the linked doc is authoritative for actually building a sequence.
 
 ### SDR team handles manually
 - Call 1 (D5) - first live voice touch, references email + LinkedIn activity
