@@ -5,10 +5,12 @@
 ## The Formula
 
 ```
-PRIORITY _ TEAM _ USECASE _ REGION _ CHANNEL _ POCNAME _ STARTDATE
+PRIORITY _ TEAM _ USECASE _ REGION _ CHANNEL _ POCNAMESTARTDATE
 ```
 
-Separator: underscore `_`. No spaces. No other characters.
+Separator: underscore `_` between every component. No spaces. No other characters.
+
+The last component is an exception: **POC name and start date are one token with no separator between them** (e.g. `GauravNaitik25AUG26`), not two underscore-separated pieces. See [POC Name](#poc-name) and [Start Date](#start-date) below. Updated 2026-08-25 to match how the team actually names campaigns; the old `_POCNAME_STARTDATE` two-token form (e.g. `_gaurav-naitik_25AUG26`) is deprecated, don't use it for new campaigns.
 
 Order rationale: **Priority** first for instant triage. **Team and use case** for cross-team grouping. **Region** scopes the audience. **Channel** tells you the motion. **POC name** locks in ownership. **Start date** anchors it.
 
@@ -68,10 +70,13 @@ Order rationale: **Priority** first for instant triage. **Team and use case** fo
 | IND | India |
 | PHL | Philippines |
 | UKEU | UK and Europe |
+| GLOBAL | Worldwide / no single region, targeting spans all of the above |
 
 **Multi-region rule:** Combine codes with hyphens, alphabetically sorted.
 - `KSA-IDN-GCC`
 - `IND-US-UKEU`
+
+`GLOBAL` is a standalone code, don't combine it with other region codes.
 
 ### Channel
 
@@ -88,17 +93,18 @@ Order rationale: **Priority** first for instant triage. **Team and use case** fo
 
 ### POC Name
 
-Lowercase first name of campaign owner. No spaces.
+TitleCase first name of campaign owner. No spaces, no separators. Multiple co-owners are concatenated directly, in the order given, each still TitleCase.
 
 | Input | Write as |
 |-------|---------|
-| Rahul Sharma | `rahul` |
-| Priya Nair | `priya` |
-| Rahul + Priya (co-own) | `rahul-priya` |
+| Rahul Sharma | `Rahul` |
+| Priya Nair | `Priya` |
+| Rahul + Priya (co-own) | `RahulPriya` |
+| Gaurav + Naitik (co-own) | `GauravNaitik` |
 
 ### Start Date
 
-`DDMMMYY` with uppercase three-letter month.
+`DDMMMYY` with uppercase three-letter month, appended **directly to the POC name with no separator**.
 
 | Date | Format |
 |------|--------|
@@ -106,40 +112,45 @@ Lowercase first name of campaign owner. No spaces.
 | April 15, 2026 | `15APR26` |
 | November 30, 2026 | `30NOV26` |
 
+Combined with POC name: `Naitik25AUG26`, `GauravNaitik25AUG26`.
+
 ---
 
 ## Full Examples
 
 | Campaign Name | What It Means |
 |---------------|---------------|
-| `P0_ABM_DREAM_US_EMAIL_rahul_01JAN26` | ABM, Dream account, US, Email, Rahul, Critical, Jan 1 2026 |
-| `P1_EVENTS_PREEVENT_IND_EMAIL-LI_priya_15APR26` | Events, Pre-event, India, Email + LinkedIn, Priya, High, Apr 15 2026 |
-| `P2_ABM_BFSI_GCC_LI_arjun_01MAY26` | ABM, BFSI industry, GCC, LinkedIn, Arjun, Medium, May 1 2026 |
-| `P1_ABM_INTENT_KSA-IDN-GCC_EMAIL-WA_rahul_10FEB26` | ABM, Intent signal, ROW, Email + WhatsApp, Rahul, High, Feb 10 2026 |
-| `P2_PRTNR_FUNDING_US_EMAIL_neha_20MAR26` | Partnership, Funding trigger, US, Email, Neha, Medium, Mar 20 2026 |
-| `P3_API_ENT500_UKEU_EMAIL-LI_sam_01JUN26` | API, Employee 500+, UK/EU, Email + LinkedIn, Sam, Low, Jun 1 2026 |
-| `P1_ABM_POSTEVENT_IND_WA-CALL_priya_20APR26` | ABM, Post-event, India, WhatsApp + Call, Priya, High, Apr 20 2026 |
-| `P0_EVENTS_DREAM_US_EMAIL-LI_rahul-priya_05JAN26` | Events, Dream accounts, US, Email + LinkedIn, Rahul + Priya (co-own), Critical, Jan 5 2026 |
+| `P0_ABM_DREAM_US_EMAIL_Rahul01JAN26` | ABM, Dream account, US, Email, Rahul, Critical, Jan 1 2026 |
+| `P1_EVENTS_PREEVENT_IND_EMAIL-LI_Priya15APR26` | Events, Pre-event, India, Email + LinkedIn, Priya, High, Apr 15 2026 |
+| `P2_ABM_BFSI_GCC_LI_Arjun01MAY26` | ABM, BFSI industry, GCC, LinkedIn, Arjun, Medium, May 1 2026 |
+| `P1_ABM_INTENT_KSA-IDN-GCC_EMAIL-WA_Rahul10FEB26` | ABM, Intent signal, ROW, Email + WhatsApp, Rahul, High, Feb 10 2026 |
+| `P2_PRTNR_FUNDING_US_EMAIL_Neha20MAR26` | Partnership, Funding trigger, US, Email, Neha, Medium, Mar 20 2026 |
+| `P3_API_ENT500_UKEU_EMAIL-LI_Sam01JUN26` | API, Employee 500+, UK/EU, Email + LinkedIn, Sam, Low, Jun 1 2026 |
+| `P1_ABM_POSTEVENT_IND_WA-CALL_Priya20APR26` | ABM, Post-event, India, WhatsApp + Call, Priya, High, Apr 20 2026 |
+| `P0_EVENTS_DREAM_US_EMAIL-LI_RahulPriya05JAN26` | Events, Dream accounts, US, Email + LinkedIn, Rahul + Priya (co-own), Critical, Jan 5 2026 |
+| `P0_ABM_API-HealthandWellness_GLOBAL_EMAIL-LI_GauravNaitik25AUG26` | ABM, custom use case, Global, Email + LinkedIn, Gaurav + Naitik (co-own), Critical, Aug 25 2026 |
 
 ---
 
-## 7 Steps to Name Your Campaign
+## 6 Steps to Name Your Campaign
 
 1. **Set priority** - Board-level (P0), strategic (P1), standard (P2), nurture (P3)
 2. **Identify team** - EVENTS / PRTNR / API / ABM
 3. **Pick use case** - see Section 3.3. If not listed, use `CUSTOM-[X]`
-4. **Define region** - use region code, multi-region hyphenated alphabetically
+4. **Define region** - use region code, multi-region hyphenated alphabetically, or `GLOBAL` for worldwide
 5. **Choose channel(s)** - single or hyphenated in first-touch order
-6. **Add POC name** - lowercase first name, hyphenate if co-owned
-7. **Add start date** - `DDMMMYY`
+6. **Add POC name + start date as one token** - TitleCase first name(s) concatenated with no separator, then `DDMMMYY` appended directly with no separator (e.g. `GauravNaitik25AUG26`)
 
 ---
 
 ## Common Mistakes
 
-- Writing `P1-EVENTS-...` with hyphens instead of underscores (underscores between components, hyphens only within multi-region / multi-channel / co-POC)
+- Writing `P1-EVENTS-...` with hyphens instead of underscores (underscores between components, hyphens only within multi-region / multi-channel)
 - Forgetting the start date
-- Using full names (`rahul-sharma`) instead of just first name (`rahul`)
+- Using full names (`rahul-sharma`) instead of just first name (`Rahul`)
+- Lowercase POC name (`rahul` instead of `Rahul`)
+- Hyphenating co-owned POC names (`gaurav-naitik` instead of `GauravNaitik`) - that format is deprecated
+- Putting an underscore between POC name and start date (`Rahul_01JAN26` instead of `Rahul01JAN26`)
 - Lowercase month (`apr26` instead of `APR26`)
 - Using "Email" or "LinkedIn" as free text instead of the codes (`EMAIL`, `LI`)
 - Using region names like "India" instead of codes (`IND`)

@@ -157,22 +157,22 @@ Present to the user:
 Every Smartlead campaign and HeyReach list name MUST follow:
 
 ```
-PRIORITY_TEAM_USECASE_REGION_CHANNEL_POCNAME_STARTDATE
+PRIORITY_TEAM_USECASE_REGION_CHANNEL_POCNAMESTARTDATE
 ```
 
 Components (see `docs/campaign-naming-convention.md` for full tables):
 - **PRIORITY**: P0 / P1 / P2 / P3
 - **TEAM**: EVENTS / PRTNR / API / ABM
 - **USECASE**: GRHIGH, ENT500, PASSDEAL, ACTDEAL, DREAM, BFSI, RETAIL, PREEVENT, POSTEVENT, INTENT, IPANON, FUNDING, EXECHIRE, CUSTOM-[X]
-- **REGION**: KSA / IDN / US / GCC / AFR / IND / PHL / UKEU (multi-region: hyphenate alphabetically, e.g. `IND-US-UKEU`)
+- **REGION**: KSA / IDN / US / GCC / AFR / IND / PHL / UKEU / GLOBAL (multi-region: hyphenate alphabetically, e.g. `IND-US-UKEU`; `GLOBAL` stands alone)
 - **CHANNEL**: EMAIL / LI / WA / CALL (multi-channel: hyphenate in order of first touch, e.g. `EMAIL-LI`)
-- **POCNAME**: Lowercase first name. Two POCs: hyphenate (`rahul-priya`)
-- **STARTDATE**: DDMMMYY format, uppercase month (e.g. `15APR26`)
+- **POCNAME+STARTDATE**: one token, no separator. TitleCase first name(s), co-owners concatenated directly (`GauravNaitik`), then `DDMMMYY` appended directly (e.g. `GauravNaitik25AUG26`). Updated 2026-08-25; the old lowercase-hyphenated, underscore-separated form (`_gaurav-naitik_25AUG26`) is deprecated.
 
 Examples:
-- `P1_EVENTS_PREEVENT_US_EMAIL_naitik_16APR26`
-- `P2_API_PASSDEAL_IND_EMAIL-LI_naitik_14APR26`
-- `P0_ABM_DREAM_GCC_EMAIL-LI-WA_rahul_01MAY26`
+- `P1_EVENTS_PREEVENT_US_EMAIL_Naitik16APR26`
+- `P2_API_PASSDEAL_IND_EMAIL-LI_Naitik14APR26`
+- `P0_ABM_DREAM_GCC_EMAIL-LI-WA_Rahul01MAY26`
+- `P0_ABM_API-HealthandWellness_GLOBAL_EMAIL-LI_GauravNaitik25AUG26`
 
 ---
 
