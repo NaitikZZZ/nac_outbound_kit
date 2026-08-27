@@ -1781,18 +1781,23 @@ async def _run_pipeline(ctx: inngest.Context, step: inngest.Step) -> dict:
     heyreach_result = await step.run("heyreach_push", _push_heyreach)
     import_result["heyreach"] = heyreach_result
 
-    async def _push_interakt():
-        if outputs.file_exists(run_dir, "whatsapp_upload.csv"):
-            try:
-                wa_df = pd.read_csv(io.BytesIO(outputs.read_file(run_dir, "whatsapp_upload.csv")))
-            except pd.errors.EmptyDataError:
-                wa_df = pd.DataFrame()
-            if not wa_df.empty:
-                wa_df = wa_df.where(pd.notna(wa_df), None)
-                return _nan_safe(interakt.push_users(wa_df.to_dict(orient="records"), campaign_title))
-        return {"status": "skipped"}
-
-    interakt_result = await step.run("interakt_push", _push_interakt)
+    # Deliberately NOT wrapped in step.run() - same event-loop-blocking pattern
+    # as reveal_phones etc. above: push_users makes a sequential blocking
+    # requests.post per WhatsApp-eligible contact (no batch endpoint), which
+    # can run for minutes on a large sheet. The return value itself is a small
+    # stats dict (not a DataFrame), so output_too_large doesn't apply here -
+    # but the blocking-the-event-loop hazard does.
+    interakt_result = {"status": "skipped"}
+    if outputs.file_exists(run_dir, "whatsapp_upload.csv"):
+        try:
+            wa_df = pd.read_csv(io.BytesIO(outputs.read_file(run_dir, "whatsapp_upload.csv")))
+        except pd.errors.EmptyDataError:
+            wa_df = pd.DataFrame()
+        if not wa_df.empty:
+            wa_df = wa_df.where(pd.notna(wa_df), None)
+            interakt_result = _nan_safe(await asyncio.to_thread(
+                interakt.push_users, wa_df.to_dict(orient="records"), campaign_title,
+            ))
     import_result["interakt"] = interakt_result
 
     await _set_step(step, "step_copy_agent_running", run_id, "copy_agent", "Copy Agent", "running")

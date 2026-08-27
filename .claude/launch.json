@@ -2,8 +2,16 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "abm-wrapper-backend",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "cd wrapper/backend && .venv/bin/python3 -m uvicorn app.main:app --port 8731 --app-dir ."],
+      "port": 8731
+    },
+    {
       "name": "abm-wrapper-frontend",
-      "url": "http://localhost:5173"
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "cd wrapper/frontend && npm run dev -- --port 5173"],
+      "port": 5173
     }
   ]
 }

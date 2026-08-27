@@ -10,6 +10,7 @@ import math
 from pathlib import Path
 
 import pandas as pd
+import phonenumbers
 
 try:
     from datetime import datetime, UTC
@@ -82,6 +83,33 @@ def strip_url_prefix(domain):
     return re.sub(r"^https?://(www\.)?", "", str(domain)).rstrip("/")
 
 
+def split_phone_number(raw) -> tuple[str | None, str | None]:
+    """Splits a phone number into (country_code, national_number) for the
+    WhatsApp/Interakt import, which wants them as separate columns rather
+    than one merged field. Handles E.164 (Apollo's sanitized_number format,
+    e.g. "+14155552671") directly; a number without a leading "+" is
+    retried as-is since most phone data already carries the country code as
+    a bare-digit prefix (e.g. "919876543210"). Falls back to (None,
+    digits-only raw) when it can't be parsed as a valid number - no data
+    loss, just no split."""
+    v = _clean_cell(raw)
+    if v is None:
+        return None, None
+    digits = re.sub(r"\D", "", str(v))
+    if not digits:
+        return None, None
+    candidate = str(v).strip()
+    if not candidate.startswith("+"):
+        candidate = "+" + digits
+    try:
+        parsed = phonenumbers.parse(candidate, None)
+        if phonenumbers.is_valid_number(parsed):
+            return str(parsed.country_code), phonenumbers.national_significant_number(parsed)
+    except phonenumbers.NumberParseException:
+        pass
+    return None, digits
+
+
 # Contact property "demographics" (label "Demographics (Geography)") is a
 # locked enumeration on the live Xoxoday portal - confirmed via a read-only
 # properties lookup, exactly 9 allowed values (shown as label -> value below).
@@ -121,6 +149,117 @@ def demographics_for(country, state, city) -> str | None:
     return DEMOGRAPHICS_FALLBACK
 
 
+# Contact property "country" is ALSO a locked enumeration on the live Xoxoday
+# portal (confirmed via a read-only properties lookup, 247 allowed values) -
+# same failure mode as demographics above: sending anything not in this exact
+# set 400s the WHOLE batch, not just the one bad row (confirmed live: a
+# single "North Macedonia" - a real, current country name Apollo returns -
+# failed an entire run's HubSpot upload, silently dropping every contact in
+# it, not just the Macedonian one). The list itself is old (pre-2019 ISO
+# short names in several places - "Macedonia (FYROM)" instead of "North
+# Macedonia", "Czech Republic" not "Czechia", "Swaziland" not "Eswatini"),
+# so this mismatch class isn't a one-off - it recurs for any country that's
+# been renamed or has a common alternate name since HubSpot's list was built.
+HUBSPOT_COUNTRY_OPTIONS = {
+    "Afghanistan", "Åland Islands", "Albania", "Algeria", "American Samoa", "Andorra", "Angola",
+    "Anguilla", "Antarctica", "Antigua and Barbuda", "Argentina", "Armenia", "Aruba",
+    "Asia/Pacific Region", "Australia", "Austria", "Azerbaijan", "Bahamas", "Bahrain", "Bangladesh",
+    "Barbados", "Belarus", "Belgium", "Belize", "Benin", "Bermuda", "Bhutan", "Bolivia",
+    "Bosnia and Herzegovina", "Botswana", "Bouvet Island", "Brazil", "British Indian Ocean Territory",
+    "British Virgin Islands", "Brunei", "Bulgaria", "Burkina Faso", "Burundi", "Cambodia", "Cameroon",
+    "Canada", "Cape Verde", "Caribbean Netherlands", "Cayman Islands", "Central African Republic",
+    "Chad", "Chile", "China", "Christmas Island", "Cocos (Keeling) Islands", "Colombia", "Comoros",
+    "Congo", "Cook Islands", "Costa Rica", "Cote d'Ivoire", "Croatia", "Cuba", "Curaçao", "Cyprus",
+    "Czech Republic", "Democratic Republic of the Congo", "Denmark", "Djibouti", "Dominica",
+    "Dominican Republic", "East Timor", "Ecuador", "Egypt", "El Salvador", "Equatorial Guinea",
+    "Eritrea", "Estonia", "Ethiopia", "Europe", "Falkland Islands", "Faroe Islands", "Fiji", "Finland",
+    "France", "French Guiana", "French Polynesia", "French Southern and Antarctic Lands", "Gabon",
+    "Gambia", "Georgia", "Germany", "Ghana", "Gibraltar", "Greece", "Greenland", "Grenada",
+    "Guadeloupe", "Guam", "Guatemala", "Guernsey", "Guinea", "Guinea-Bissau", "Guyana", "Haiti",
+    "Heard Island and McDonald Islands", "Honduras", "Hong Kong", "Hungary", "Iceland", "India",
+    "Indonesia", "Iran", "Iraq", "Ireland", "Isle of Man", "Israel", "Italy", "Jamaica", "Japan",
+    "Jersey", "Jordan", "Kazakhstan", "Kenya", "Kiribati", "Kosovo", "Kuwait", "Kyrgyzstan", "Laos",
+    "Latvia", "Lebanon", "Lesotho", "Liberia", "Libya", "Liechtenstein", "Lithuania", "Luxembourg",
+    "Macau", "Macedonia (FYROM)", "Madagascar", "Malawi", "Malaysia", "Maldives", "Mali", "Malta",
+    "Marshall Islands", "Martinique", "Mauritania", "Mauritius", "Mayotte", "Mexico", "Micronesia",
+    "Moldova", "Monaco", "Mongolia", "Montenegro", "Montserrat", "Morocco", "Mozambique",
+    "Myanmar (Burma)", "Namibia", "Nauru", "Nepal", "Netherlands", "Netherlands Antilles",
+    "New Caledonia", "New Zealand", "Nicaragua", "Niger", "Nigeria", "Niue", "Norfolk Island",
+    "North Korea", "Northern Mariana Islands", "Norway", "Oman", "Pakistan", "Palau", "Palestine",
+    "Panama", "Papua New Guinea", "Paraguay", "Peru", "Philippines", "Pitcairn Islands", "Poland",
+    "Portugal", "Puerto Rico", "Qatar", "Réunion", "Romania", "Russia", "Rwanda",
+    "Saint Barthélemy", "Saint Helena", "Saint Kitts and Nevis", "Saint Lucia", "Saint Martin",
+    "Saint Pierre and Miquelon", "Saint Vincent and the Grenadines", "Samoa", "San Marino",
+    "Sao Tome and Principe", "Saudi Arabia", "Senegal", "Serbia", "Seychelles", "Sierra Leone",
+    "Singapore", "Sint Maarten", "Slovakia", "Slovenia", "Solomon Islands", "Somalia", "South Africa",
+    "South Georgia and the South Sandwich Islands", "South Korea", "South Sudan", "Spain",
+    "Sri Lanka", "Sudan", "Suriname", "Svalbard and Jan Mayen", "Swaziland", "Sweden", "Switzerland",
+    "Syria", "Taiwan", "Tajikistan", "Tanzania", "Thailand", "Togo", "Tokelau", "Tonga",
+    "Trinidad and Tobago", "Tunisia", "Turkey", "Turkmenistan", "Turks and Caicos Islands", "Tuvalu",
+    "U.S. Virgin Islands", "Uganda", "Ukraine", "United Arab Emirates", "United Kingdom",
+    "United States", "United States Minor Outlying Islands", "Uruguay", "Uzbekistan", "Vanuatu",
+    "Vatican City", "Venezuela", "Vietnam", "Wallis and Futuna", "Western Sahara", "Yemen", "Zambia",
+    "Zimbabwe", "MENAT", "APAC", "AFRICA", "NAM", "LATAM",
+}
+_HUBSPOT_COUNTRY_LOOKUP = {v.lower(): v for v in HUBSPOT_COUNTRY_OPTIONS}
+# Known renames/aliases where the modern/common name (what Apollo and most
+# real-world data sources use) differs from HubSpot's older picklist label.
+# Not exhaustive by design - anything not covered here or matched
+# case-insensitively above just falls through normalize_hubspot_country's
+# "drop rather than risk breaking the batch" rule below.
+_HUBSPOT_COUNTRY_ALIASES = {
+    "north macedonia": "Macedonia (FYROM)",
+    "czechia": "Czech Republic",
+    "eswatini": "Swaziland",
+    "cabo verde": "Cape Verde",
+    "timor-leste": "East Timor",
+    "ivory coast": "Cote d'Ivoire",
+    "myanmar": "Myanmar (Burma)",
+    "burma": "Myanmar (Burma)",
+    "micronesia, federated states of": "Micronesia",
+    "federated states of micronesia": "Micronesia",
+    "the bahamas": "Bahamas",
+    "the gambia": "Gambia",
+    "democratic republic of congo": "Democratic Republic of the Congo",
+    "republic of the congo": "Congo",
+    "republic of korea": "South Korea",
+    "korea, republic of": "South Korea",
+    "democratic people's republic of korea": "North Korea",
+    "korea, democratic people's republic of": "North Korea",
+    "russian federation": "Russia",
+    "syrian arab republic": "Syria",
+    "iran, islamic republic of": "Iran",
+    "lao people's democratic republic": "Laos",
+    "brunei darussalam": "Brunei",
+    "holy see": "Vatican City",
+    "vatican": "Vatican City",
+    "united states of america": "United States",
+    "usa": "United States",
+    "u.s.": "United States",
+    "u.s.a.": "United States",
+    "great britain": "United Kingdom",
+    "uae": "United Arab Emirates",
+}
+
+
+def normalize_hubspot_country(raw) -> str | None:
+    """Maps a free-text country name to HubSpot's exact locked picklist
+    value, or None if it can't be confidently matched. Returning None (drop
+    the field) rather than the raw string is deliberate: a bad enum value
+    400s the entire batch upsert, not just the one contact, so a country we
+    don't recognize is far better left blank than sent raw."""
+    v = _clean_cell(raw)
+    if v is None:
+        return None
+    v = str(v).strip()
+    key = v.lower()
+    if key in _HUBSPOT_COUNTRY_LOOKUP:
+        return _HUBSPOT_COUNTRY_LOOKUP[key]
+    if key in _HUBSPOT_COUNTRY_ALIASES:
+        return _HUBSPOT_COUNTRY_ALIASES[key]
+    return None
+
+
 def build_hubspot_import_file(enriched_df: pd.DataFrame, campaign_title: str) -> pd.DataFrame:
     """Mirrors the mapping validated against the live Xoxoday HubSpot portal
     this session - only fields with a confirmed HubSpot property. The raw
@@ -138,7 +277,7 @@ def build_hubspot_import_file(enriched_df: pd.DataFrame, campaign_title: str) ->
 
     rows = []
     for _, row in verified.iterrows():
-        country, state, city = clean(row.get("country")), clean(row.get("state")), clean(row.get("city"))
+        country_raw, state, city = clean(row.get("country")), clean(row.get("state")), clean(row.get("city"))
         domain = clean(row.get("company_domain")) or strip_url_prefix(clean(row.get("Domain")))
         rows.append({
             "firstname": clean(row.get("first_name")),
@@ -156,11 +295,15 @@ def build_hubspot_import_file(enriched_df: pd.DataFrame, campaign_title: str) ->
             "total_funding": clean(row.get("organization_total_funding")),
             "technologies": clean(row.get("technologies")),
             "seniority_level": SENIORITY_MAP.get(row.get("seniority")),
-            "country": country,
+            # normalize_hubspot_country can legitimately return None for a
+            # country not on HubSpot's locked list - demographics_for still
+            # uses the raw string below, since its own lookup table is
+            # separate from HubSpot's country picklist.
+            "country": normalize_hubspot_country(country_raw),
             "state": state,
             "address": clean(row.get("formatted_address")),
             "city": city,
-            "demographics": demographics_for(country, state, city),
+            "demographics": demographics_for(country_raw, state, city),
             "department___job_function__apollo_": clean(row.get("departments")),
             "campaign_title": campaign_title,
         })
@@ -192,54 +335,123 @@ def _company_of(row):
     return _clean_cell(row.get("organization_name") or row.get("search_company"))
 
 
+# Shared by both linkedin_upload.csv and calling_upload.csv - every channel
+# file carries the SAME full set of whatever was found, matching everything
+# build_hubspot_import_file fills for the email file (name/title/seniority,
+# company + firmographics, every contact channel, location, campaign) - not
+# just its own primary field. A HeyReach automation branching on "is there an
+# email" (or a dialer script wanting a LinkedIn URL to hand the SDR) needs
+# the other channels' data present on the same row, not stripped out.
+# Row-INCLUSION still differs per file (see build_channel_files); only the
+# column set is unified and matched to the HubSpot file's breadth.
+_CHANNEL_COLUMNS = [
+    "first_name", "last_name", "job_title", "seniority", "departments",
+    "company_name", "company_domain", "organization_linkedin_url", "organization_industry",
+    "employee_count", "annual_revenue", "total_funding", "technologies",
+    "email", "linkedin_url", "phone",
+    "city", "state", "country", "address", "demographics",
+    "campaign_title",
+]
+
+
+def _channel_record(row, campaign_title: str) -> dict:
+    country = _clean_cell(row.get("country"))
+    state = _clean_cell(row.get("state"))
+    city = _clean_cell(row.get("city"))
+    return {
+        "first_name": _clean_cell(row.get("first_name")),
+        "last_name": _clean_cell(row.get("last_name")),
+        "job_title": _clean_cell(row.get("title")),
+        "seniority": _clean_cell(row.get("seniority")),
+        "departments": _clean_cell(row.get("departments")),
+        "company_name": _company_of(row),
+        "company_domain": _clean_cell(row.get("company_domain")) or strip_url_prefix(_clean_cell(row.get("Domain"))),
+        "organization_linkedin_url": _clean_cell(row.get("organization_linkedin_url")),
+        "organization_industry": _clean_cell(row.get("organization_industry")),
+        "employee_count": bucket_employees(row.get("organization_estimated_num_employees")),
+        "annual_revenue": _clean_cell(row.get("organization_annual_revenue")),
+        "total_funding": _clean_cell(row.get("organization_total_funding")),
+        "technologies": _clean_cell(row.get("technologies")),
+        "email": _clean_cell(row.get("email")),
+        "linkedin_url": _clean_cell(row.get("linkedin_url")),
+        "phone": _clean_cell(row.get("Phone Number")) or _clean_cell(row.get("mobile_phone")),
+        "city": city,
+        "state": state,
+        "country": country,
+        "address": _clean_cell(row.get("formatted_address")),
+        "demographics": demographics_for(country, state, city),
+        "campaign_title": campaign_title,
+    }
+
+
+# whatsapp_upload.csv carries country_code and phone_number as separate
+# columns (Interakt's bulk-contact-import template wants them split, not one
+# merged field) alongside the same name/company/campaign context as the other
+# channel files.
+_WHATSAPP_COLUMNS = [
+    "first_name", "last_name", "country_code", "phone_number", "email",
+    "company_name", "job_title", "campaign_title",
+]
+
+
+def _whatsapp_record(row, campaign_title: str) -> dict:
+    phone = _clean_cell(row.get("Phone Number")) or _clean_cell(row.get("mobile_phone"))
+    country_code, phone_number = split_phone_number(phone)
+    return {
+        "first_name": _clean_cell(row.get("first_name")),
+        "last_name": _clean_cell(row.get("last_name")),
+        "country_code": country_code,
+        "phone_number": phone_number,
+        "email": _clean_cell(row.get("email")),
+        "company_name": _company_of(row),
+        "job_title": _clean_cell(row.get("title")),
+        "campaign_title": campaign_title,
+    }
+
+
 def build_channel_files(enriched_df: pd.DataFrame, campaign_title: str) -> dict[str, pd.DataFrame]:
-    """Splits the enriched contacts into three channel-specific upload files:
+    """Splits the enriched contacts into four channel-specific upload files:
 
       email_upload.csv    - verified-email contacts only (HubSpot-ready shape).
-                            Guarantees no blank-email rows ever reach HubSpot.
+                            Guarantees no blank-email rows ever reach HubSpot,
+                            since HubSpot's contact upsert is keyed by email.
       linkedin_upload.csv  - contacts that have a LinkedIn URL (HeyReach import).
       calling_upload.csv   - contacts that have a phone number (dialer/SDR list).
+      whatsapp_upload.csv   - contacts that have a phone number (Interakt import),
+                            with country_code and phone_number as separate columns.
 
     A contact can legitimately land in more than one file - that's expected,
-    each channel gets whoever it can actually reach on that channel.
+    each channel gets whoever it can actually reach on that channel. Every
+    row in linkedin/calling carries the same full column set (_CHANNEL_COLUMNS)
+    regardless of which file it's in, so e.g. calling_upload.csv still has
+    linkedin_url and email whenever they're known, not just phone.
     """
     if enriched_df is None or enriched_df.empty:
         empty = pd.DataFrame()
-        return {"email": empty, "linkedin": empty, "calling": empty}
+        return {"email": empty, "linkedin": empty, "calling": empty, "whatsapp": empty}
 
     # Email file reuses the validated HubSpot mapping (verified email only).
     email_df = build_hubspot_import_file(enriched_df, campaign_title)
     email_df = email_df[email_df["email"].apply(lambda v: bool(_clean_cell(v)))].copy()
 
-    linkedin_rows, calling_rows = [], []
+    linkedin_rows, calling_rows, whatsapp_rows = [], [], []
     for _, row in enriched_df.iterrows():
-        first = _clean_cell(row.get("first_name"))
-        last = _clean_cell(row.get("last_name"))
-        company = _company_of(row)
-        title = _clean_cell(row.get("title"))
-        domain = _clean_cell(row.get("company_domain")) or strip_url_prefix(_clean_cell(row.get("Domain")))
         li = _clean_cell(row.get("linkedin_url"))
         phone = _clean_cell(row.get("Phone Number")) or _clean_cell(row.get("mobile_phone"))
+        if li is None and phone is None:
+            continue
 
         if li is not None:
-            linkedin_rows.append({
-                "first_name": first, "last_name": last, "company_name": company,
-                "job_title": title, "linkedin_url": li, "email": _clean_cell(row.get("email")),
-                "company_domain": domain, "campaign_title": campaign_title,
-            })
+            linkedin_rows.append(_channel_record(row, campaign_title))
         if phone is not None:
-            calling_rows.append({
-                "first_name": first, "last_name": last, "company_name": company,
-                "job_title": title, "phone": phone, "email": _clean_cell(row.get("email")),
-                "company_domain": domain, "campaign_title": campaign_title,
-            })
+            calling_rows.append(_channel_record(row, campaign_title))
+            whatsapp_rows.append(_whatsapp_record(row, campaign_title))
 
-    linkedin_columns = ["first_name", "last_name", "company_name", "job_title", "linkedin_url", "email", "company_domain", "campaign_title"]
-    calling_columns = ["first_name", "last_name", "company_name", "job_title", "phone", "email", "company_domain", "campaign_title"]
     return {
         "email": email_df,
-        "linkedin": pd.DataFrame(linkedin_rows, columns=linkedin_columns),
-        "calling": pd.DataFrame(calling_rows, columns=calling_columns),
+        "linkedin": pd.DataFrame(linkedin_rows, columns=_CHANNEL_COLUMNS),
+        "calling": pd.DataFrame(calling_rows, columns=_CHANNEL_COLUMNS),
+        "whatsapp": pd.DataFrame(whatsapp_rows, columns=_WHATSAPP_COLUMNS),
     }
 
 
@@ -293,6 +505,12 @@ def build_summary_markdown(campaign_title: str, stats: dict, accounts_processed:
                 lines.append(f"\n_(+{excluded - len(excluded_rows)} more excluded, not listed)_")
     lines.append("")
 
+    seniority_filter = stats.get("seniority_filter")
+    if seniority_filter and not seniority_filter.get("skipped"):
+        lines.append("## Seniority filter")
+        lines.append(f"- Excluded {seniority_filter.get('excluded', 0)} below-managerial contact(s); {seniority_filter.get('remaining', 0)} remain")
+        lines.append("")
+
     search = stats.get("apollo_search", {})
     enrich = stats.get("apollo_enrich", {})
     phone = stats.get("apollo_phone", {})
@@ -334,6 +552,7 @@ def build_summary_markdown(campaign_title: str, stats: dict, accounts_processed:
         lines.append(f"- Email (HubSpot-ready, verified email only): {channels.get('email', 0)}")
         lines.append(f"- LinkedIn (HeyReach import): {channels.get('linkedin', 0)}")
         lines.append(f"- Calling (dialer list): {channels.get('calling', 0)}")
+        lines.append(f"- WhatsApp (Interakt import): {channels.get('whatsapp', 0)}")
         lines.append("")
 
     lines.append("## HubSpot")
@@ -349,6 +568,11 @@ def build_summary_markdown(campaign_title: str, stats: dict, accounts_processed:
             lines.append(f"- HeyReach list `{hr.get('list_name')}` (id {hr.get('list_id')}): {hr.get('pushed', 0)} LinkedIn lead(s) pushed")
         elif hr.get("status") not in (None, "skipped"):
             lines.append(f"- HeyReach: {hr.get('message', hr.get('status'))}")
+        ia = import_result.get("interakt") or {}
+        if ia.get("status") == "pushed":
+            lines.append(f"- Interakt: {ia.get('pushed', 0)} WhatsApp contact(s) pushed" + (f", {ia['failed']} failed" if ia.get("failed") else ""))
+        elif ia.get("status") not in (None, "skipped"):
+            lines.append(f"- Interakt: {ia.get('message', ia.get('status'))}")
     else:
         lines.append("- Not yet imported")
     lines.append("")
@@ -364,16 +588,18 @@ def write_outputs(run_dir: Path, accounts_processed: pd.DataFrame, enriched: pd.
         "02_enriched_contacts.csv": write_file(run_dir, "02_enriched_contacts.csv", enriched.to_csv(index=False), "text/csv"),
     }
 
-    # Three channel-specific deliverables. The email file IS the HubSpot import.
+    # Four channel-specific deliverables. The email file IS the HubSpot import.
     channels = build_channel_files(enriched, campaign_title)
     refs["email_upload.csv"] = write_file(run_dir, "email_upload.csv", channels["email"].to_csv(index=False), "text/csv")
     refs["linkedin_upload.csv"] = write_file(run_dir, "linkedin_upload.csv", channels["linkedin"].to_csv(index=False), "text/csv")
     refs["calling_upload.csv"] = write_file(run_dir, "calling_upload.csv", channels["calling"].to_csv(index=False), "text/csv")
+    refs["whatsapp_upload.csv"] = write_file(run_dir, "whatsapp_upload.csv", channels["whatsapp"].to_csv(index=False), "text/csv")
 
     stats["channel_counts"] = {
         "email": int(len(channels["email"])),
         "linkedin": int(len(channels["linkedin"])),
         "calling": int(len(channels["calling"])),
+        "whatsapp": int(len(channels["whatsapp"])),
     }
     refs["SUMMARY.md"] = write_file(run_dir, "SUMMARY.md", build_summary_markdown(campaign_title, stats, accounts_processed), "text/markdown")
 

@@ -2,17 +2,20 @@ import json
 import math
 import mimetypes
 import os
+import re
 import time
 import traceback
 import uuid
 from pathlib import Path
 from typing import Optional
 
+import base64
+
 import inngest
-from fastapi import APIRouter, Body, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Body, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import Response
 
-from .. import config, run_status, vercel_blob
+from .. import config, redis_cache, run_status, vercel_blob
 from ..inngest_client import client as inngest_client
 from ..models import AnswerRequest, ImportConfirmRequest, PendingQuestion, RunStatus
 from ..pipeline import runner, input_sources, outputs, icp_mapper
@@ -84,6 +87,49 @@ def upload_token(filename: str = Body(...), content_type: Optional[str] = Body(N
         "api_version": vercel_blob.API_VERSION,
         "content_type": content_type or "text/csv",
     }
+
+
+_UPLOAD_CHUNK_TTL_SECONDS = 3600  # matches upload-token's client-token validity - long enough for a slow mobile upload, short enough that an abandoned upload's chunks don't linger in Redis forever
+
+
+@router.post("/upload-chunk")
+async def upload_chunk(request: Request, run_id: str, chunk_index: int):
+    """Receives one piece of a CSV the browser is sending same-origin, used when
+    the direct-to-Blob PUT can't reach vercel-storage.com at all - some mobile
+    carriers (and corporate networks/VPNs) block that third-party domain
+    outright, so retrying the direct PUT never helps. Small pieces sent to our
+    own origin sidestep the block; upload-finalize reassembles them and does
+    the one PUT to Blob itself, server-side, where the browser's network can't
+    interfere. Chunks land in Redis rather than local disk because a Vercel
+    serverless invocation doesn't share a filesystem with the next request."""
+    if not redis_cache.is_configured():
+        raise HTTPException(503, "Chunked upload storage is not configured on this server")
+    data = await request.body()
+    redis_cache.set_json_chunked(f"upload:{run_id}:{chunk_index}", base64.b64encode(data).decode(), ex=_UPLOAD_CHUNK_TTL_SECONDS)
+    return {"received": chunk_index}
+
+
+@router.post("/upload-finalize")
+def upload_finalize(
+    run_id: str = Body(...),
+    pathname: str = Body(...),
+    total_chunks: int = Body(...),
+    content_type: str = Body("text/csv"),
+):
+    if not redis_cache.is_configured():
+        raise HTTPException(503, "Chunked upload storage is not configured on this server")
+    if not vercel_blob.is_configured():
+        raise HTTPException(503, "Blob storage is not configured on this server")
+    parts = []
+    for i in range(total_chunks):
+        b64 = redis_cache.get_json_chunked(f"upload:{run_id}:{i}")
+        if b64 is None:
+            raise HTTPException(400, f"Missing chunk {i} of {total_chunks} - retry the upload")
+        parts.append(base64.b64decode(b64))
+    vercel_blob.put(pathname, b"".join(parts), content_type=content_type)
+    for i in range(total_chunks):
+        redis_cache.delete_chunked(f"upload:{run_id}:{i}")
+    return {"run_id": run_id, "pathname": pathname}
 
 
 @router.post("", response_model=RunStatus)
@@ -160,6 +206,9 @@ async def create_run(
             except json.JSONDecodeError:
                 raise HTTPException(400, "targeting_json must be valid JSON")
 
+    # Stashed so a later /retry can re-send the exact same event - see
+    # retry_run() below.
+    run_status.update(run_id, _event_data=event_data)
     inngest_client.send_sync(inngest.Event(name="run/start", data=event_data))
     return _to_status(run_id, "inngest")
 
@@ -237,6 +286,52 @@ def answer_question(run_id: str, body: AnswerRequest):
     return _to_status(run_id, engine)
 
 
+@router.post("/{run_id}/retry", response_model=RunStatus)
+def retry_run(run_id: str):
+    """Re-sends the original run/start event for a failed run, e.g. after a
+    transient upstream error (Vercel Blob, Apollo, etc.) killed it outright -
+    see vercel_blob.put()'s own retry-with-backoff for the narrower case that
+    now self-heals without needing this at all.
+
+    Not a true step-level resume: Inngest's step.run() memoization is scoped
+    to the failed execution, not to this business-level run_id, so a retry
+    reruns the whole pipeline from the top rather than picking up where it
+    left off. In practice this is cheaper than it sounds - the Redis-backed
+    domain/Apollo caches (redis_cache.py) mean most enrichment lookups
+    already made are cache hits on retry, not re-spent credits."""
+    job = run_status.get(run_id)
+    if not job:
+        raise HTTPException(404, "Run not found")
+    if job.get("stage") != "failed":
+        raise HTTPException(400, f"Run is not failed (current stage: {job.get('stage')!r}) - nothing to retry")
+    event_data = job.get("_event_data")
+    if not event_data:
+        raise HTTPException(400, "No saved input for this run - it started before retry support existed")
+
+    run_status.init(run_id)
+    run_status.update(run_id, _event_data=event_data)
+    inngest_client.send_sync(inngest.Event(name="run/start", data=event_data))
+    return _to_status(run_id, "inngest")
+
+
+_FILENAME_UNSAFE = re.compile(r'[\\/:*?"<>|\x00-\x1f]')
+
+
+def _download_filename(run_id: str, filename: str) -> str:
+    """Prefixes the downloaded filename with the run's campaign title (e.g.
+    "P0_ABM_..._email_upload.csv" instead of a bare "email_upload.csv"), so
+    a user with several runs' files downloaded has an easy way to tell which
+    campaign each one belongs to. Falls back to the bare filename when no
+    campaign title is on record (e.g. a run that never reached the naming
+    step, or the legacy hubspot_project engine, which doesn't track this)."""
+    job = run_status.get(run_id)
+    title = (job.get("stats") or {}).get("campaign_title") if job else None
+    if not title:
+        return filename
+    safe_title = _FILENAME_UNSAFE.sub("_", str(title)).strip("._ ")
+    return f"{safe_title}_{filename}" if safe_title else filename
+
+
 @router.get("/{run_id}/files/{filename}")
 def download_file(run_id: str, filename: str):
     run_dir = config.RUNS_DIR / run_id
@@ -244,9 +339,10 @@ def download_file(run_id: str, filename: str):
         raise HTTPException(404, "File not found")
     content = outputs.read_file(run_dir, filename)
     media_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+    download_name = _download_filename(run_id, filename)
     return Response(
         content=content, media_type=media_type,
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={"Content-Disposition": f'attachment; filename="{download_name}"'},
     )
 
 

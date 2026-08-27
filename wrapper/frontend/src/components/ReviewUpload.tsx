@@ -8,6 +8,7 @@ const CHANNELS = [
   { key: "email", file: "email_upload.csv", label: "Email (HubSpot)", note: "Verified emails only. Uploaded to HubSpot + a static list." },
   { key: "linkedin", file: "linkedin_upload.csv", label: "LinkedIn (HeyReach)", note: "Pushed to a new HeyReach list (named after the campaign) on upload." },
   { key: "calling", file: "calling_upload.csv", label: "Calling (dialer)", note: "Contacts with a phone number, for the SDR dialer." },
+  { key: "whatsapp", file: "whatsapp_upload.csv", label: "WhatsApp (Interakt)", note: "Contacts with a phone number, country code and number in separate columns for Interakt import." },
 ];
 
 // Minimal CSV parse (handles quoted fields) for a small on-screen preview.
@@ -31,10 +32,13 @@ function parseCsv(text: string, maxRows: number): string[][] {
   return rows;
 }
 
+const EXCLUDED_PAGE_SIZE = 50;
+
 export default function ReviewUpload({ run, onImported }: { run: RunStatus; onImported: () => void }) {
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<string[][] | null>(null);
+  const [excludedPage, setExcludedPage] = useState(0);
 
   const counts = (run.stats?.channel_counts ?? {}) as Record<string, number>;
   const imported = run.stage === "done";
@@ -137,19 +141,47 @@ export default function ReviewUpload({ run, onImported }: { run: RunStatus; onIm
             )}{" "}
             - these were removed and not uploaded.
           </p>
-          <table className="kv-table">
-            <thead><tr><th>Company</th><th>Domain</th><th>Why excluded</th></tr></thead>
-            <tbody>
-              {excludedRows.slice(0, 50).map((r, i) => (
-                <tr key={i}><td>{r.company}</td><td>{r.domain}</td><td>{r.reason}</td></tr>
-              ))}
-            </tbody>
-          </table>
+          {(() => {
+            const pageCount = Math.max(1, Math.ceil(excludedRows.length / EXCLUDED_PAGE_SIZE));
+            const page = Math.min(excludedPage, pageCount - 1);
+            const start = page * EXCLUDED_PAGE_SIZE;
+            const pageRows = excludedRows.slice(start, start + EXCLUDED_PAGE_SIZE);
+            return (
+              <>
+                <table className="kv-table">
+                  <thead><tr><th>Company</th><th>Domain</th><th>Why excluded</th></tr></thead>
+                  <tbody>
+                    {pageRows.map((r, i) => (
+                      <tr key={start + i}><td>{r.company}</td><td>{r.domain}</td><td>{r.reason}</td></tr>
+                    ))}
+                  </tbody>
+                </table>
+                {pageCount > 1 && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 10 }}>
+                    <button
+                      className="btn-secondary"
+                      disabled={page === 0}
+                      onClick={() => setExcludedPage((p) => Math.max(0, p - 1))}
+                    >
+                      ← Prev
+                    </button>
+                    <span style={{ fontSize: 12, color: "var(--dark-200)" }}>
+                      Page {page + 1} of {pageCount} (rows {start + 1}-{start + pageRows.length} of {excludedRows.length})
+                    </span>
+                    <button
+                      className="btn-secondary"
+                      disabled={page >= pageCount - 1}
+                      onClick={() => setExcludedPage((p) => Math.min(pageCount - 1, p + 1))}
+                    >
+                      Next →
+                    </button>
+                  </div>
+                )}
+              </>
+            );
+          })()}
           {excl.excluded > excludedRows.length && (
             <p style={{ fontSize: 12, marginTop: 8 }}>+{excl.excluded - excludedRows.length} more excluded (full list in the run summary).</p>
-          )}
-          {excludedRows.length > 50 && (
-            <p style={{ fontSize: 12, marginTop: 8 }}>Showing first 50 of {excludedRows.length}.</p>
           )}
         </div>
       )}
@@ -207,6 +239,20 @@ export default function ReviewUpload({ run, onImported }: { run: RunStatus; onIm
               ) : (
                 <>
                   <span className="tag-warning">HeyReach</span> {importResult.heyreach.message || importResult.heyreach.status}
+                </>
+              )}
+            </p>
+          )}
+          {importResult.interakt && importResult.interakt.status !== "skipped" && (
+            <p style={{ fontSize: 13, marginTop: 6 }}>
+              {importResult.interakt.status === "pushed" ? (
+                <>
+                  <span className="tag-success">Interakt</span> {importResult.interakt.pushed} WhatsApp contact(s) pushed
+                  {importResult.interakt.failed ? `, ${importResult.interakt.failed} failed` : ""}.
+                </>
+              ) : (
+                <>
+                  <span className="tag-warning">Interakt</span> {importResult.interakt.message || importResult.interakt.status}
                 </>
               )}
             </p>

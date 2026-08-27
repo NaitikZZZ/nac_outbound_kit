@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { IcpOptions, WizardTargeting } from "../lib/types";
-import { startRun, uploadCsvDirect, getIcpMapping } from "../lib/api";
+import { startRun, resolveCsvUpload, getIcpMapping } from "../lib/api";
 import { FileField } from "./SourceForm";
 import LocationMultiSelect from "./LocationMultiSelect";
 import AddCustomChip from "./AddCustomChip";
@@ -25,10 +25,10 @@ export default function CampaignIdeaWizard({
     setAiSubmitting(true);
     setAiError(null);
     try {
-      const uploaded = aiCsvFile ? await uploadCsvDirect(aiCsvFile) : undefined;
+      const resolved = aiCsvFile ? await resolveCsvUpload(aiCsvFile) : undefined;
       const run = await startRun({
         inputSource: "campaign_idea", campaignIdea: aiIdea.trim(),
-        csvBlobPathname: uploaded?.pathname, runId: uploaded?.runId,
+        csvFile: resolved?.csvFile, csvBlobPathname: resolved?.csvBlobPathname, runId: resolved?.runId,
       });
       onStarted(run.run_id);
     } catch (e: any) {
@@ -43,40 +43,53 @@ export default function CampaignIdeaWizard({
   // a use case is picked, to prefill sensible defaults). ----
   const [step, setStep] = useState(0);
   const [idea, setIdea] = useState("");
-  const [product, setProduct] = useState<string | null>(null);
-  const [useCase, setUseCase] = useState<string | null>(null);
+  const [selectedUseCases, setSelectedUseCases] = useState<{ product: string; useCase: string }[]>([]);
   const [useCaseOther, setUseCaseOther] = useState("");
   const [otherMode, setOtherMode] = useState(false);
   const [jobTitles, setJobTitles] = useState<string[]>([]);
   const [jobTitleOptions, setJobTitleOptions] = useState<string[]>([]);
+  const [includeLookalikes, setIncludeLookalikes] = useState(false);
   const [employeeSizes, setEmployeeSizes] = useState<string[]>([]);
   const [regions, setRegions] = useState<string[]>([]);
+  const [hqLocationsText, setHqLocationsText] = useState("");
+  const [companyNames, setCompanyNames] = useState<string[]>([]);
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mappingLoading, setMappingLoading] = useState(false);
 
-  async function pickUseCase(p: string, uc: string) {
-    setProduct(p);
-    setUseCase(uc);
+  // Toggling a use case on/off, not replacing the selection - the user can
+  // target more than one use case (e.g. two Empuls angles) at once. Picking
+  // a new use case merges its job titles/regions into what's already there
+  // rather than overwriting it, so earlier picks (and any manual edits made
+  // to them) survive.
+  async function toggleUseCase(p: string, uc: string) {
+    const isSelected = selectedUseCases.some((s) => s.product === p && s.useCase === uc);
+    if (isSelected) {
+      setSelectedUseCases((cur) => cur.filter((s) => !(s.product === p && s.useCase === uc)));
+      return;
+    }
+    setSelectedUseCases((cur) => [...cur, { product: p, useCase: uc }]);
     setOtherMode(false);
     setMappingLoading(true);
     try {
       const mapping = await getIcpMapping(p, uc);
-      setJobTitleOptions(mapping.job_titles || []);
-      setJobTitles(mapping.job_titles || []);
-      if (mapping.regions?.length) setRegions(mapping.regions);
+      const newTitles = mapping.job_titles || [];
+      setJobTitleOptions((cur) => Array.from(new Set([...cur, ...newTitles])));
+      setJobTitles((cur) => Array.from(new Set([...cur, ...newTitles])));
+      if (mapping.regions?.length) {
+        const newRegions = mapping.regions;
+        setRegions((cur) => Array.from(new Set([...cur, ...newRegions])));
+      }
     } catch {
       // Best-effort prefill - the user can still pick everything manually.
-      setJobTitleOptions([]);
     } finally {
       setMappingLoading(false);
     }
   }
 
   function pickOther() {
-    setProduct(null);
-    setUseCase(null);
+    setSelectedUseCases([]);
     setJobTitleOptions([]);
     setOtherMode(true);
   }
@@ -88,22 +101,31 @@ export default function CampaignIdeaWizard({
     setSubmitting(true);
     setError(null);
     try {
-      const effectiveUseCase = useCase || useCaseOther.trim();
+      const effectiveUseCase = selectedUseCases.map((s) => s.useCase).join(", ") || useCaseOther.trim();
+      const effectiveProduct = Array.from(new Set(selectedUseCases.map((s) => s.product))).join(", ");
+      // Split on ";" or newline, not "," - a single HQ location is often
+      // itself a "City, State" pair, so a comma can't double as the
+      // between-locations separator here (unlike the region/country field).
+      const hqLocations = hqLocationsText.split(/[;\n]+/).map((s) => s.trim()).filter(Boolean);
       const wizardTargeting: WizardTargeting = {
-        product: product || undefined,
+        product: effectiveProduct || undefined,
         use_case: effectiveUseCase || undefined,
         job_titles: jobTitles,
+        include_lookalikes: includeLookalikes,
         employee_sizes: employeeSizes,
         regions,
+        organization_locations: hqLocations,
+        company_names: csvFile ? undefined : companyNames,
       };
       const campaignIdea = idea.trim() || effectiveUseCase || "Campaign idea (targeting set via wizard)";
-      const uploaded = csvFile ? await uploadCsvDirect(csvFile) : undefined;
+      const resolved = csvFile ? await resolveCsvUpload(csvFile) : undefined;
       const run = await startRun({
         inputSource: "campaign_idea",
         campaignIdea,
         wizardTargeting,
-        csvBlobPathname: uploaded?.pathname,
-        runId: uploaded?.runId,
+        csvFile: resolved?.csvFile,
+        csvBlobPathname: resolved?.csvBlobPathname,
+        runId: resolved?.runId,
       });
       onStarted(run.run_id);
     } catch (e: any) {
@@ -198,7 +220,9 @@ export default function CampaignIdeaWizard({
 
           {step === 1 && (
             <div>
-              <p style={{ fontSize: 13, marginBottom: 12 }}>Which use case is closest to what you're running?</p>
+              <p style={{ fontSize: 13, marginBottom: 12 }}>
+                Which use case(s) are closest to what you're running? Pick as many as apply.
+              </p>
               {hasUseCaseData ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: 16, marginBottom: 12 }}>
                   {Object.entries(useCases).map(([p, cases]) => (
@@ -211,9 +235,9 @@ export default function CampaignIdeaWizard({
                           <button
                             key={uc}
                             type="button"
-                            className={`pill ${product === p && useCase === uc ? "active" : ""}`}
+                            className={`pill ${selectedUseCases.some((s) => s.product === p && s.useCase === uc) ? "active" : ""}`}
                             disabled={mappingLoading}
-                            onClick={() => pickUseCase(p, uc)}
+                            onClick={() => toggleUseCase(p, uc)}
                           >
                             {uc}
                           </button>
@@ -279,6 +303,16 @@ export default function CampaignIdeaWizard({
                 placeholder="Add a job title..."
                 onAdd={(t) => setJobTitles((cur) => (cur.includes(t) ? cur : [...cur, t]))}
               />
+              <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, marginTop: 12, cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={includeLookalikes}
+                  onChange={(e) => setIncludeLookalikes(e.target.checked)}
+                  style={{ width: "auto" }}
+                />
+                Include similar/lookalike titles (broader match - e.g. "Total Rewards Manager" when you asked
+                for "Total Rewards Head"). Leave unchecked to match these titles exactly.
+              </label>
             </div>
           )}
 
@@ -317,6 +351,18 @@ export default function CampaignIdeaWizard({
                 placeholder="Add a region/country not listed above..."
                 onAdd={(r) => setRegions((cur) => (cur.includes(r) ? cur : [...cur, r]))}
               />
+
+              <p style={{ fontSize: 13, margin: "20px 0 8px" }}>
+                Company HQ location (optional) - for targeting companies headquartered somewhere
+                specific (city, state, or country), regardless of where the contact themselves sits.
+                Semicolon-separated for more than one.
+              </p>
+              <input
+                type="text"
+                value={hqLocationsText}
+                onChange={(e) => setHqLocationsText(e.target.value)}
+                placeholder="e.g. Austin, Texas; Bengaluru, India"
+              />
             </div>
           )}
 
@@ -325,17 +371,56 @@ export default function CampaignIdeaWizard({
               <div className="card" style={{ padding: 14, marginBottom: 12 }}>
                 <table className="kv-table">
                   <tbody>
-                    <tr><td style={{ fontWeight: 600, width: 120 }}>Use case</td><td>{useCase || useCaseOther || "(not set - defaults apply)"}</td></tr>
-                    <tr><td style={{ fontWeight: 600 }}>Job titles</td><td>{jobTitles.length ? jobTitles.join(", ") : "Default HR/People-leader list"}</td></tr>
+                    <tr>
+                      <td style={{ fontWeight: 600, width: 120 }}>Use case</td>
+                      <td>{selectedUseCases.length ? selectedUseCases.map((s) => s.useCase).join(", ") : (useCaseOther || "(not set - defaults apply)")}</td>
+                    </tr>
+                    <tr>
+                      <td style={{ fontWeight: 600 }}>Job titles</td>
+                      <td>
+                        {jobTitles.length ? jobTitles.join(", ") : "Default HR/People-leader list"}
+                        {jobTitles.length > 0 && (
+                          <span style={{ color: "var(--dark-200)" }}>
+                            {" "}({includeLookalikes ? "includes similar titles" : "exact match only"})
+                          </span>
+                        )}
+                      </td>
+                    </tr>
                     <tr><td style={{ fontWeight: 600 }}>Employee size</td><td>{employeeSizes.length ? employeeSizes.join(", ") : "No filter"}</td></tr>
                     <tr><td style={{ fontWeight: 600 }}>Region</td><td>{regions.length ? regions.join(", ") : "Global"}</td></tr>
+                    <tr><td style={{ fontWeight: 600 }}>Company HQ location</td><td>{hqLocationsText.trim() ? hqLocationsText : "No filter"}</td></tr>
                   </tbody>
                 </table>
               </div>
               <FileField
-                label="Optional: attach a company list (CSV/Excel) - otherwise you'll be asked for company names to search"
+                label="Optional: attach a company list (CSV/Excel) - otherwise add target companies below"
                 file={csvFile} onChange={setCsvFile} accept=".csv,.xlsx,.xls"
               />
+              {!csvFile && (
+                <div style={{ marginTop: 16 }}>
+                  <p style={{ fontSize: 13, marginBottom: 8 }}>
+                    Target companies to search (add them now so you're not asked again once the run starts).
+                  </p>
+                  {companyNames.length > 0 && (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+                      {companyNames.map((c) => (
+                        <span
+                          key={c}
+                          className="pill active"
+                          style={{ cursor: "pointer" }}
+                          onClick={() => setCompanyNames((cur) => cur.filter((x) => x !== c))}
+                        >
+                          {c} ✕
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <AddCustomChip
+                    placeholder="Add a company name, or paste a comma-separated list..."
+                    onAdd={(c) => setCompanyNames((cur) => (cur.includes(c) ? cur : [...cur, c]))}
+                  />
+                </div>
+              )}
             </div>
           )}
 

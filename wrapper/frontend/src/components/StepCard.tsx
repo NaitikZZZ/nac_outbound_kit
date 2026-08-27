@@ -3,6 +3,7 @@ import type { PendingQuestion } from "../lib/types";
 import { answerQuestion } from "../lib/api";
 import LocationMultiSelect from "./LocationMultiSelect";
 import AddCustomChip from "./AddCustomChip";
+import ClusterMultiSelect from "./ClusterMultiSelect";
 
 const KIND_LABEL: Record<string, string> = { project: "Project", partner: "Partner", event: "Event" };
 
@@ -17,8 +18,15 @@ export default function StepCard({
 
   const fields = question.context?.fields as Record<string, any> | undefined;
   const [formTitles, setFormTitles] = useState<string>(fields?.persona_titles?.default ?? "");
-  const [formCap, setFormCap] = useState<number>(fields?.per_title_cap?.default ?? 2);
+  const [formCap, setFormCap] = useState<number>(fields?.per_title_cap?.default ?? 1);
+  const [formCompanyCap, setFormCompanyCap] = useState<number>(fields?.company_cap?.default ?? 1);
+  const [formIncludeLookalikes, setFormIncludeLookalikes] = useState<boolean>(fields?.include_lookalikes?.default ?? false);
   const [formRegions, setFormRegions] = useState<string[]>(fields?.person_locations?.default ?? []);
+  const [formOrgLocations, setFormOrgLocations] = useState<string>(fields?.organization_locations?.default ?? "");
+  const [formClusters, setFormClusters] = useState<string[]>(fields?.icp_clusters?.default ?? []);
+  const [formManagementLevel, setFormManagementLevel] = useState<string[]>(fields?.management_level?.default ?? []);
+  const [formDepartments, setFormDepartments] = useState<string[]>(fields?.departments?.default ?? []);
+  const [formExcludeTitles, setFormExcludeTitles] = useState<string>(fields?.exclude_titles?.default ?? "");
   const [icpTitles, setIcpTitles] = useState<string[]>(fields?.job_titles?.default ?? []);
   const [icpRegions, setIcpRegions] = useState<string[]>(fields?.regions?.default ?? []);
   const [icpEmployeeSizes, setIcpEmployeeSizes] = useState<string[]>(fields?.employee_sizes?.default ?? []);
@@ -327,15 +335,46 @@ export default function StepCard({
             <input
               type="number"
               min={fields.per_title_cap?.min ?? 1}
-              max={fields.per_title_cap?.max ?? 3}
+              max={fields.per_title_cap?.max ?? 50}
               value={formCap}
               onChange={(e) => {
                 const v = parseInt(e.target.value, 10);
-                setFormCap(Number.isNaN(v) ? (fields.per_title_cap?.default ?? 2) : v);
+                setFormCap(Number.isNaN(v) ? (fields.per_title_cap?.default ?? 1) : v);
               }}
               style={{ width: 100 }}
             />
           </div>
+
+          {fields.company_cap && (
+            <div>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+                {fields.company_cap.label}
+              </label>
+              <input
+                type="number"
+                min={fields.company_cap?.min ?? 1}
+                max={fields.company_cap?.max ?? 10}
+                value={formCompanyCap}
+                onChange={(e) => {
+                  const v = parseInt(e.target.value, 10);
+                  setFormCompanyCap(Number.isNaN(v) ? (fields.company_cap?.default ?? 1) : v);
+                }}
+                style={{ width: 100 }}
+              />
+            </div>
+          )}
+
+          {fields.include_lookalikes && (
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={formIncludeLookalikes}
+                onChange={(e) => setFormIncludeLookalikes(e.target.checked)}
+                style={{ width: "auto" }}
+              />
+              {fields.include_lookalikes.label}
+            </label>
+          )}
 
           <div>
             <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
@@ -350,6 +389,98 @@ export default function StepCard({
             />
           </div>
 
+          {fields.organization_locations && (
+            <div>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+                {fields.organization_locations.label}
+              </label>
+              <input
+                type="text"
+                value={formOrgLocations}
+                onChange={(e) => setFormOrgLocations(e.target.value)}
+                placeholder={fields.organization_locations?.placeholder || ""}
+              />
+            </div>
+          )}
+
+          {fields.icp_clusters && (
+            <div>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+                {fields.icp_clusters.label}
+              </label>
+              <ClusterMultiSelect
+                options={fields.icp_clusters.options || []}
+                selected={formClusters}
+                onChange={setFormClusters}
+                disabled={submitting}
+              />
+            </div>
+          )}
+
+          {fields.management_level && (
+            <div>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+                {fields.management_level.label}
+              </label>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                {(fields.management_level.options as { value: string; label: string }[]).map((opt) => (
+                  <label key={opt.value} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer" }}>
+                    <input
+                      type="checkbox"
+                      checked={formManagementLevel.includes(opt.value)}
+                      onChange={() =>
+                        setFormManagementLevel((cur) =>
+                          cur.includes(opt.value) ? cur.filter((v) => v !== opt.value) : [...cur, opt.value]
+                        )
+                      }
+                      style={{ width: "auto" }}
+                    />
+                    {opt.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {fields.departments && (
+            <div>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+                {fields.departments.label}
+              </label>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                {(fields.departments.options as { value: string; label: string }[]).map((opt) => (
+                  <label key={opt.value} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer" }}>
+                    <input
+                      type="checkbox"
+                      checked={formDepartments.includes(opt.value)}
+                      onChange={() =>
+                        setFormDepartments((cur) =>
+                          cur.includes(opt.value) ? cur.filter((v) => v !== opt.value) : [...cur, opt.value]
+                        )
+                      }
+                      style={{ width: "auto" }}
+                    />
+                    {opt.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {fields.exclude_titles && (
+            <div>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+                {fields.exclude_titles.label}
+              </label>
+              <input
+                type="text"
+                value={formExcludeTitles}
+                onChange={(e) => setFormExcludeTitles(e.target.value)}
+                placeholder={fields.exclude_titles?.placeholder || ""}
+              />
+            </div>
+          )}
+
           <div>
             <button
               className="btn-primary"
@@ -358,7 +489,14 @@ export default function StepCard({
                 submit({
                   persona_titles: formTitles,
                   per_title_cap: formCap,
+                  company_cap: formCompanyCap,
+                  include_lookalikes: formIncludeLookalikes,
                   person_locations: formRegions,
+                  organization_locations: formOrgLocations,
+                  icp_clusters: formClusters,
+                  management_level: formManagementLevel,
+                  departments: formDepartments,
+                  exclude_titles: formExcludeTitles,
                 })
               }
             >
