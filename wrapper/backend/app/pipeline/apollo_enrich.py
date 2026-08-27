@@ -37,7 +37,7 @@ REGION_GROUPS: dict[str, list[str]] = {
                "Ireland", "Sweden", "Switzerland", "Belgium", "Poland"],
     "APAC": ["Australia", "Singapore", "Japan", "India", "Hong Kong", "New Zealand", "South Korea"],
     "GCC": ["Saudi Arabia", "United Arab Emirates", "Qatar", "Kuwait", "Bahrain", "Oman"],
-    "KSA": ["Saudi Arabia"],
+    "Saudi Arabia": ["Saudi Arabia"],
     "Africa": ["South Africa", "Nigeria", "Kenya", "Egypt", "Ghana", "Morocco"],
     "SEA": ["Singapore", "Malaysia", "Indonesia", "Philippines", "Thailand", "Vietnam"],
     "Philippines": ["Philippines"],
