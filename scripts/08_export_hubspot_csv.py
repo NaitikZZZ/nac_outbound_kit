@@ -62,8 +62,15 @@ def export(master_csv, output_path, seg_map, sl_map, hr_map, hubspot_record_id, 
     else:
         out["Job Title"] = ""
 
-    out["Phone Number"] = master.get("best_phone", "").fillna("") if "best_phone" in master.columns else ""
+    # Contactability
     out["LinkedIn URL"] = master.get("linkedin_url", "").fillna("") if "linkedin_url" in master.columns else ""
+    out["Phone Number"] = master.get("best_phone", "").fillna("") if "best_phone" in master.columns else ""
+    if "best_phone" in master.columns:
+        out["Has Phone"] = master["best_phone"].apply(
+            lambda x: "Yes" if pd.notna(x) and str(x).strip() not in ("", "nan", "None") else "No"
+        )
+
+    # Location
     out["City"] = master.get("city", "").fillna("") if "city" in master.columns else ""
     out["State/Region"] = master.get("state", "").fillna("") if "state" in master.columns else ""
     out["Country"] = master.get("country", "").fillna("") if "country" in master.columns else ""
@@ -72,6 +79,16 @@ def export(master_csv, output_path, seg_map, sl_map, hr_map, hubspot_record_id, 
     if "deal_name" in master.columns:
         out["Deal Name (Historic)"] = master["deal_name"].fillna("")
 
+    # Data quality / enrichment tracking
+    if "zb_status" in master.columns:
+        out["Email Verification Status"] = master["zb_status"].fillna("")
+    if "enrichment_source" in master.columns:
+        out["Enrichment Source"] = master["enrichment_source"].fillna("")
+    if "smartlead_ready" in master.columns:
+        out["Smartlead Ready"] = master["smartlead_ready"].map({True: "Yes", False: "No"}).fillna("No")
+    if "heyreach_ready" in master.columns:
+        out["HeyReach Ready"] = master["heyreach_ready"].map({True: "Yes", False: "No"}).fillna("No")
+
     # Campaign tracking (if segment column present)
     if "segment" in master.columns and seg_map:
         out["Campaign Segment"] = master["segment"].map(seg_map).fillna("")
@@ -79,18 +96,6 @@ def export(master_csv, output_path, seg_map, sl_map, hr_map, hubspot_record_id, 
         out["Smartlead Campaign ID"] = master["segment"].map(sl_map).fillna("")
     if "segment" in master.columns and hr_map:
         out["HeyReach List ID"] = master["segment"].map(hr_map).fillna("")
-
-    # Data quality
-    if "zb_status" in master.columns:
-        out["Email Verification Status"] = master["zb_status"].fillna("")
-    if "smartlead_ready" in master.columns:
-        out["Smartlead Ready"] = master["smartlead_ready"].map({True: "Yes", False: "No"}).fillna("No")
-    if "heyreach_ready" in master.columns:
-        out["HeyReach Ready"] = master["heyreach_ready"].map({True: "Yes", False: "No"}).fillna("No")
-    if "best_phone" in master.columns:
-        out["Has Phone"] = master["best_phone"].apply(
-            lambda x: "Yes" if pd.notna(x) and str(x).strip() not in ("", "nan", "None") else "No"
-        )
 
     # Enrichment metadata
     out["Enriched Date"] = enriched_date
