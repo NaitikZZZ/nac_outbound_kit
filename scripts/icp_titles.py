@@ -16,6 +16,19 @@ Each family carries:
               band; scaled by SIZE_MULT elsewhere
 """
 
+# Non-ICP: below-managerial titles to exclude from outreach lists regardless of company
+# fit. Matched as whole words (case-insensitive) against the raw title string. "assistant"
+# and "executive" only exclude when NOT paired with a manager-or-above qualifier, since
+# "Assistant Manager" and "Account Executive" (a real senior IC sales title) are not junior.
+NON_ICP_TITLE_KEYWORDS = [
+    "associate", "analyst", "coordinator", "specialist", "officer",
+    "representative", "trainee", "intern", "junior",
+    "senior executive",  # India title ladder: Executive < Senior Executive < Asst Manager < Manager
+    "executive",         # bare "Executive" / "HR Executive" (India junior tier) - see qualifier note above
+    "assistant",         # bare "Assistant" - "Assistant Manager" is NOT excluded, see qualifier note above
+]
+NON_ICP_TITLE_KEEP_IF_PAIRED_WITH = ["manager", "director", "vp", "vice president", "head", "chief", "account"]
+
 # Buying-center headcount grows sublinearly with company size. Multipliers are relative
 # to the 1000-4999 reference band that `seats` is expressed in.
 SIZE_MULT = {
@@ -302,4 +315,22 @@ def for_product(product):
 
 def seats_at(family, band):
     return family["seats"] * SIZE_MULT[band]
+
+
+def is_non_icp_title(title):
+    """True if `title` is below-managerial and should be excluded from outreach.
+
+    Whole-word, case-insensitive match against NON_ICP_TITLE_KEYWORDS. A hit is
+    overridden (kept, not excluded) if the title also contains one of
+    NON_ICP_TITLE_KEEP_IF_PAIRED_WITH, e.g. "Assistant Manager" or "Account Executive".
+    """
+    import re
+    t = str(title or "").lower()
+    if not t.strip():
+        return False
+    hit = any(re.search(rf"\b{re.escape(kw)}\b", t) for kw in NON_ICP_TITLE_KEYWORDS)
+    if not hit:
+        return False
+    paired = any(re.search(rf"\b{re.escape(kw)}\b", t) for kw in NON_ICP_TITLE_KEEP_IF_PAIRED_WITH)
+    return not paired
 

@@ -11,7 +11,34 @@ Usage:
 
 If your master CSV doesn't have a 'segment' column, the campaign/smartlead/heyreach ID maps are ignored.
 """
-import argparse, os, pandas as pd
+import argparse, os, re, pandas as pd
+
+# Dial codes for countries actually in Xoxoday's outreach regions (see
+# docs/campaign-naming-convention.md REGION list). Used only to split an E.164
+# phone (+<dial code><national number>) into separate columns for WhatsApp/HS
+# import. If the country isn't here or the number doesn't start with its dial
+# code, we leave Phone Country Code blank rather than guess wrong.
+COUNTRY_DIAL_CODES = {
+    "india": "91", "united states": "1", "united kingdom": "44",
+    "saudi arabia": "966", "united arab emirates": "971", "qatar": "974",
+    "kuwait": "965", "bahrain": "973", "oman": "968",
+    "indonesia": "62", "philippines": "63", "singapore": "65", "malaysia": "60",
+    "south africa": "27", "nigeria": "234", "kenya": "254", "egypt": "20",
+    "germany": "49", "france": "33", "netherlands": "31", "spain": "34",
+    "ireland": "353", "italy": "39", "poland": "48", "sweden": "46",
+    "canada": "1", "australia": "61",
+}
+
+
+def split_phone(phone_raw, country):
+    """Return (country_code, local_number) from an E.164-ish phone string."""
+    digits = re.sub(r"\D", "", str(phone_raw or ""))
+    if not digits:
+        return "", ""
+    code = COUNTRY_DIAL_CODES.get(str(country or "").strip().lower(), "")
+    if code and digits.startswith(code) and len(digits) > len(code):
+        return code, digits[len(code):]
+    return "", digits
 
 
 def parse_map(s):
@@ -74,6 +101,13 @@ def export(master_csv, output_path, seg_map, sl_map, hr_map, hubspot_record_id, 
     out["City"] = master.get("city", "").fillna("") if "city" in master.columns else ""
     out["State/Region"] = master.get("state", "").fillna("") if "state" in master.columns else ""
     out["Country"] = master.get("country", "").fillna("") if "country" in master.columns else ""
+
+    # WhatsApp needs country code and the local number in separate columns, not one
+    # combined E.164 string.
+    if "best_phone" in master.columns:
+        split = master.apply(lambda r: split_phone(r.get("best_phone"), r.get("country")), axis=1)
+        out["Phone Country Code"] = split.apply(lambda t: t[0])
+        out["Phone Number (Local)"] = split.apply(lambda t: t[1])
 
     # Historic deal name
     if "deal_name" in master.columns:

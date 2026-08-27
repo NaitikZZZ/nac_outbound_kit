@@ -110,6 +110,7 @@
 - ❌ Locked into a multi-year contract with Achievers / Workhuman / Vantage Circle
 - ❌ No discoverable buyer email contacts
 - ❌ On DNC / blacklist
+- ❌ Below-managerial title (Associate, Executive, Senior Executive, Analyst, Coordinator, Specialist, Officer, Representative, Trainee, Intern, bare Assistant). Confirmed 2026-08-28: never contact below manager level regardless of company fit. Exceptions: "Assistant Manager" and above, and "Account Executive" (senior IC sales title, not junior) are NOT excluded. Programmatic check: `is_non_icp_title()` in `scripts/icp_titles.py`.
 
 ---
 

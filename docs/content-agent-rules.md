@@ -63,7 +63,12 @@ Every drafted email, DM, script, brief, or doc gets a humanizer pass inline befo
 ## CSV Output Defaults
 - Every output CSV includes `full_name` (first + last) and `company_domain`.
 - Confirm `company_domain` resolution with the operator before generating.
-- Normalize before any API upload or file send: `first_name` (first token only), `last_name` (strip credentials/suffixes), `company_name` (strip legal suffixes). These feed email merge tags directly.
+- Normalize before any API upload or file send: `first_name` (first token only), `last_name` (strip credentials/suffixes), `company_name` (strip legal suffixes). These feed email merge tags directly, and company-name normalization (via `resolve_company_domains.py`'s cache) is what makes company-name-based email pattern guesses reliable.
+- Confirmed 2026-08-28, applies to every export regardless of source channel:
+  - HubSpot/email export (`08_export_hubspot_csv.py`) always carries Phone Number and LinkedIn URL alongside email, so a single "holistic" row can be imported to HubSpot.
+  - Attempt email enrichment on LinkedIn-sourced leads too (not just LinkedIn URL) so HubSpot workflow triggers can fire on them where possible. This is best-effort, not a gate: if no email is found, still export the prospect with LinkedIn URL only. Never drop a lead from the export just because email enrichment came up empty.
+  - WhatsApp/HS import needs the phone split into two columns, not one E.164 string: `08_export_hubspot_csv.py` outputs `Phone Country Code` and `Phone Number (Local)` (see `split_phone()` / `COUNTRY_DIAL_CODES` in that script) alongside the existing combined `Phone Number`.
+  - Exclude below-managerial titles (Associate, Executive, Analyst, Coordinator, Specialist, Officer, etc.) from every list before outreach - see `reference/icp-scoring-criteria.md` Disqualification Criteria and `is_non_icp_title()` in `scripts/icp_titles.py`.
 
 ## Smartlead Campaign Defaults
 Timezone `Asia/Calcutta`, Mon-Fri 9-6, 20 min send interval, 200/day cap, tracking off, ESP matching on, AI auto-categorization on all categories, OOO handling with 7-day restart.
