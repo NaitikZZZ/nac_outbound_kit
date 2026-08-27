@@ -22,7 +22,7 @@ ENTRY: CHECK_IS_CONNECTION
 |                         `-- no reply -> END (wait 15d)
 |
 `-- Not connected
-      VIEW_PROFILE (0h)
+      VIEW_PROFILE (wait 3h)
       `-- LIKE_POST (wait 3h)
            `-- CONNECTION_REQUEST, no note (wait 1d, withdraw after 30d)
                 |-- accepted -> DM1 (wait 1d)
@@ -39,6 +39,8 @@ ENTRY: CHECK_IS_CONNECTION
 4. **DM1 has two content variants, one per branch.** Already-connected gets a "since we're connected" opener. Not-connected-then-accepted gets a "thanks for connecting" opener. DM2, DM3, and DM4 content is identical across both branches, only DM1 and the delay before DM2 (5d vs 6d) differ.
 5. **Connection requests carry no note** (`messages: [""]`), matching the standing rule against pitch copy on the connect step, and expire after 30 days (`toBeWithdrawnAfterDays: 30`).
 6. **If the connection request is never accepted, the lead ends after 50 days.** No further touches beyond that.
+7. **Every non-root node needs `actionDelay` >= 3 hours (<= 500 days), including `END` and `LIKE_POST` nodes; `0` is rejected.** Only the true root of the whole tree (`CHECK_IS_CONNECTION` here) may have no delay. The `VIEW_PROFILE` step opening the "not connected" branch is non-root, so it carries the 3h minimum too, not 0h. See `references/node-reference.md` in the sequence-templates skill for the full validation rules, confirmed by live API testing 2026-06-08.
+8. **`LIKE_POST` needs a `payload`** (`reactBefore`, `skipDelayIfCannotLike`, `reactionType`/`randomReaction`) - it isn't a no-payload node like `VIEW_PROFILE`/`FOLLOW`.
 
 ## Message count is not fixed by this blueprint
 
