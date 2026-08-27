@@ -75,7 +75,7 @@ from ..inngest_client import client
 from . import (
     apollo_enrich, association_resolve, copy_agent, domain_resolution, estimates,
     github_pr, heyreach, hubspot_exclusion, hubspot_import, icp_mapper, input_sources,
-    naming, normalize, outputs, web_completeness, web_scrape,
+    interakt, naming, normalize, outputs, web_completeness, web_scrape,
 )
 from .runner import COUNTRY_OPTIONS, REGION_OPTIONS, _map_existing_contact_columns
 
@@ -90,6 +90,14 @@ def _guess_col(df: pd.DataFrame, candidates: list[str]) -> str | None:
             if cand.lower() in header:
                 return original
     return None
+
+
+# Ordered most- to least-preferred: a sheet with both a "Final Work Email"
+# and a plain "Email"/"Work Email" column should use the more-verified one.
+# _guess_col checks candidates in this order for an exact column-name match
+# before ever falling back to substring matching, so this ordering is what
+# actually decides which column wins when a sheet has several.
+_EMAIL_COL_CANDIDATES = ["final work email", "work email", "email address", "email"]
 
 
 def _blank_domain_mask(df: pd.DataFrame) -> pd.Series:
@@ -159,11 +167,29 @@ def _targeting_from_wizard(wizard_targeting: dict):
     there's nothing left to infer or re-confirm, so callers skip
     _extract_and_confirm_icp (no Claude call, no icp_confirm_form ask) and
     use this directly. Returns (persona_titles, person_locations,
-    employee_ranges), same shape _extract_and_confirm_icp returns."""
+    employee_ranges, exact_titles, organization_locations) - the first three
+    the same shape _extract_and_confirm_icp returns; exact_titles is True
+    unless the wizard's "include similar/lookalike titles" box was checked.
+    organization_locations is the separate company-HQ location filter (city/
+    state/country free text) for "HQ based" use cases - distinct from
+    person_locations, which filters by where the contact themselves sits."""
     job_titles = [t.strip() for t in (wizard_targeting.get("job_titles") or []) if str(t).strip()]
     regions = [r.strip() for r in (wizard_targeting.get("regions") or []) if str(r).strip()]
     employee_ranges = _normalize_employee_size_labels(wizard_targeting.get("employee_sizes") or [])
-    return job_titles or None, regions or None, employee_ranges
+    exact_titles = not bool(wizard_targeting.get("include_lookalikes"))
+    org_locations = [r.strip() for r in (wizard_targeting.get("organization_locations") or []) if str(r).strip()]
+    return job_titles or None, regions or None, employee_ranges, exact_titles, org_locations or None
+
+
+def _company_names_from_wizard(wizard_targeting: dict) -> list[str]:
+    """Same deal as _targeting_from_wizard, for the no-CSV path's target
+    companies - if the wizard's review step already collected them, the
+    mid-run "company names to search" ask below is skipped entirely instead
+    of re-asking for something the user already gave. Routed through
+    _parse_company_names so a pasted URL still gets reduced to a bare
+    hostname the same way a runtime answer would."""
+    names = wizard_targeting.get("company_names") or []
+    return _parse_company_names("\n".join(str(n) for n in names))
 
 
 def _read_csv_blob(csv_blob_pathname: str, csv_filename: str) -> pd.DataFrame:
@@ -230,7 +256,7 @@ def _fill_missing_from_raw(enriched_df: pd.DataFrame, raw_df: pd.DataFrame) -> p
     """
     out = enriched_df.copy()
 
-    raw_email_col = next((c for c in raw_df.columns if c.lower() in ["email", "email address"]), None)
+    raw_email_col = _guess_col(raw_df, _EMAIL_COL_CANDIDATES)
     raw_phone_col = next((c for c in raw_df.columns if c.lower() in ["phone", "phone number", "mobile", "mobile number"]), None)
 
     if raw_email_col and raw_email_col in raw_df.columns:
@@ -460,13 +486,16 @@ If uncertain, pick the most likely match. Return ONLY JSON, no markdown."""
 
 async def _add_more_prospects_loop(step: inngest.Step, run_id: str, candidates_df: pd.DataFrame,
                                     persona_titles, person_locations, employee_ranges, do_search,
-                                    max_iterations: int = 5):
+                                    exact_titles: bool = True, max_iterations: int = 5,
+                                    organization_locations=None):
     """Bounded version of runner.py's unbounded `while add_more:` loop (lines
     597-715 there) - Inngest step keys must be unique per run, so a real
     while loop can't work here; capped at max_iterations rounds instead.
     do_search(names, titles, locations, employee_ranges, key_suffix) is the
     same closure the caller used for the initial search, reused here for
-    each iteration."""
+    each iteration. organization_locations (company HQ filter) carries
+    through unchanged across iterations - only the campaign-idea path can set
+    it, and re-extracting ICP from a refined idea never touches it."""
     total_found = len(candidates_df)
     for i in range(1, max_iterations + 1):
         add_more = await _ask(
@@ -495,7 +524,8 @@ async def _add_more_prospects_loop(step: inngest.Step, run_id: str, candidates_d
             if not names:
                 continue
             more_df, _more_stats = await do_search(names, persona_titles, person_locations, employee_ranges,
-                                                     key_suffix=f"_more_{i}")
+                                                     key_suffix=f"_more_{i}", exact_titles=exact_titles,
+                                                     p_org_locations=organization_locations)
             candidates_df = pd.concat([candidates_df, more_df], ignore_index=True)
         else:
             new_idea = await _ask(
@@ -515,7 +545,8 @@ async def _add_more_prospects_loop(step: inngest.Step, run_id: str, candidates_d
             employee_ranges = new_employee_ranges or employee_ranges
             same_companies = candidates_df["Company"].dropna().unique().tolist()
             new_df, _new_stats = await do_search(same_companies, persona_titles, person_locations, employee_ranges,
-                                                   key_suffix=f"_refilter_{i}")
+                                                   key_suffix=f"_refilter_{i}", exact_titles=exact_titles,
+                                                   p_org_locations=organization_locations)
             candidates_df = pd.concat([candidates_df, new_df], ignore_index=True)
             if "obfuscated_name" in candidates_df.columns:
                 candidates_df = candidates_df.drop_duplicates(subset=["obfuscated_name", "Company"], keep="first")
@@ -704,6 +735,8 @@ async def _run_pipeline(ctx: inngest.Context, step: inngest.Step) -> dict:
     persona_titles_from_idea = None
     person_locations_from_idea = None
     employee_ranges_from_idea = None
+    exact_titles_from_idea = True
+    organization_locations_from_idea = None
 
     if not campaign_idea_no_csv:
         # Some exports (seen on a real HubSpot pull) carry the same header twice -
@@ -753,7 +786,8 @@ async def _run_pipeline(ctx: inngest.Context, step: inngest.Step) -> dict:
             if wizard_targeting:
                 # User already confirmed targeting in the wizard - skip Claude
                 # extraction and the icp_confirm_form re-ask entirely.
-                persona_titles_from_idea, person_locations_from_idea, employee_ranges_from_idea = \
+                (persona_titles_from_idea, person_locations_from_idea, employee_ranges_from_idea,
+                 exact_titles_from_idea, organization_locations_from_idea) = \
                     _targeting_from_wizard(wizard_targeting)
             else:
                 persona_titles_from_idea, person_locations_from_idea, employee_ranges_from_idea = \
@@ -761,6 +795,7 @@ async def _run_pipeline(ctx: inngest.Context, step: inngest.Step) -> dict:
                         step, run_id, campaign_idea,
                         extract_key="icp_extract_with_csv", confirm_key="icp_confirm_with_csv",
                     )
+                exact_titles_from_idea = True  # no wizard toggle on this path - exact-title matching by default
 
         # ============ Domain Resolution (gated) ============
         existing_domain_col = "Domain" if "Domain" in df.columns else _guess_col(df, ["domain", "website", "company domain"])
@@ -781,13 +816,23 @@ async def _run_pipeline(ctx: inngest.Context, step: inngest.Step) -> dict:
                              {"skipped": True, "already_present": already_present,
                               "reason": "every row already has a domain"})
         else:
-            uncached = domain_resolution.count_uncached(df[missing_mask], resolved_company_col)
+            # count_needs_apollo checks Clearbit live (free) for every
+            # uncached company first, so this estimate reflects what will
+            # actually cost a credit - not just "uncached", which would
+            # overstate it since Clearbit resolves a lot of these for free
+            # before Apollo is ever touched.
+            async def _count_needs_apollo():
+                return domain_resolution.count_needs_apollo(df[missing_mask], resolved_company_col)
+
+            uncached = await step.run("count_domains_needing_apollo", _count_needs_apollo)
             est = estimates.cost_block("domain_resolution", uncached)
+            free_via_clearbit_or_cache = missing_count - uncached
 
             dom_answer = await _ask(
                 step, run_id, "domain_resolution_needed", "yes_no",
-                f"{missing_count} of {len(df)} rows need a domain. {uncached} need a paid Apollo lookup "
-                f"(~{est['credits']} credits, ${est['usd']}); {missing_count - uncached} are cached (free). Resolve them?",
+                f"{missing_count} of {len(df)} rows need a domain. Clearbit (free) and the domain cache "
+                f"already cover {free_via_clearbit_or_cache} of those; {uncached} need a paid Apollo lookup "
+                f"(~{est['credits']} credits, ${est['usd']}). Resolve them?",
                 default="yes", context={"step": "domain", "estimate": est, "missing": missing_count, "uncached": uncached},
             )
 
@@ -796,14 +841,14 @@ async def _run_pipeline(ctx: inngest.Context, step: inngest.Step) -> dict:
                                message=f"Resolving {missing_count} missing company domain(s) via Apollo")
                 await _set_step(step, "step_domain_running", run_id, "domain", "Domain Resolution", "running")
 
-                async def _resolve():
-                    resolved_subset, domain_stats = domain_resolution.resolve_domains_for_df(
-                        df[missing_mask].copy(), resolved_company_col, employee_col)
-                    return _nan_safe({"records": resolved_subset.to_dict("records"), "domain_stats": domain_stats})
-
-                result = await step.run("resolve_domains", _resolve)
-                resolved_subset = pd.DataFrame(result["records"])
-                domain_stats = result["domain_stats"]
+                # Deliberately NOT wrapped in step.run() - same output_too_large /
+                # event-loop-blocking pattern as reveal_phones above: this runs on
+                # the full missing-domain subset (thousands of rows) via a
+                # blocking, thread-pooled Apollo call.
+                resolved_subset, domain_stats = await asyncio.to_thread(
+                    domain_resolution.resolve_domains_for_df,
+                    df[missing_mask].copy(), resolved_company_col, employee_col,
+                )
 
                 df.loc[missing_mask, "Domain"] = resolved_subset["Domain"].values
                 df.loc[missing_mask, "Resolved Country"] = resolved_subset["Resolved Country"].values
@@ -841,13 +886,19 @@ async def _run_pipeline(ctx: inngest.Context, step: inngest.Step) -> dict:
 
             exclusion_domain_col = "Domain" if "Domain" in df.columns else (domain_col or _guess_col(df, ["Domain", "Website"]))
 
-            async def _run_exclusion():
-                result_df, excl_stats = hubspot_exclusion.run_exclusion_check(df, exclusion_domain_col)
-                return _nan_safe({"records": result_df.to_dict("records"), "exclusion_stats": excl_stats})
-
-            excl_result = await step.run("run_exclusion_check", _run_exclusion)
-            df = pd.DataFrame(excl_result["records"])
-            exclusion_stats = excl_result["exclusion_stats"]
+            # Deliberately NOT wrapped in step.run(): same "output_too_large" cap
+            # documented on _read_csv_blob above - returning the full DataFrame
+            # (871+ rows, every original + normalized column) as a memoized step
+            # output blows Inngest's response-size limit, which silently wedges
+            # the run at "running" forever (the kill happens on Inngest's side,
+            # never as a catchable Python exception). Safe to skip memoization:
+            # this is a pure function of (df, DNU cache), so a replay just
+            # recomputes the same result - the asyncio.to_thread offload below
+            # still keeps the blocking Redis fetch + index build off the event
+            # loop, it just isn't captured as a separate Inngest step anymore.
+            df, exclusion_stats = await asyncio.to_thread(
+                hubspot_exclusion.run_exclusion_check, df, exclusion_domain_col
+            )
             exclusion_stats["dnu_list_url"] = config.exclusion_list_url()
 
             excl_name_col = resolved_company_col if resolved_company_col in df.columns else company_col
@@ -885,9 +936,9 @@ async def _run_pipeline(ctx: inngest.Context, step: inngest.Step) -> dict:
         if job_change_idx:
             await _set_stat(step, "stat_job_changes", run_id, "job_changes", len(job_change_idx))
 
-        email_col_existing = _guess_col(ok_df, ["email", "email address"])
-        resolved_first_col = "Cleaned First Name" if "Cleaned First Name" in ok_df.columns else _guess_col(ok_df, ["first name", "firstname"])
-        resolved_last_col = "Cleaned Last Name" if "Cleaned Last Name" in ok_df.columns else _guess_col(ok_df, ["last name", "lastname"])
+        email_col_existing = _guess_col(ok_df, _EMAIL_COL_CANDIDATES)
+        resolved_first_col = "Cleaned First Name" if "Cleaned First Name" in ok_df.columns else _guess_col(ok_df, ["first name", "firstname", "first_name"])
+        resolved_last_col = "Cleaned Last Name" if "Cleaned Last Name" in ok_df.columns else _guess_col(ok_df, ["last name", "lastname", "last_name"])
         has_existing_contacts = (
             bool(resolved_first_col) and bool(resolved_last_col)
             and int(ok_df[resolved_first_col].notna().sum()) > 0
@@ -916,7 +967,16 @@ async def _run_pipeline(ctx: inngest.Context, step: inngest.Step) -> dict:
                     persona_titles = persona_titles_from_idea
                     person_locations = person_locations_from_idea
                     employee_ranges = employee_ranges_from_idea
-                    per_title_cap = 2
+                    exact_titles = exact_titles_from_idea
+                    organization_locations = organization_locations_from_idea
+                    # No management-level/department/exclude-titles ask on the
+                    # wizard path yet - keep prior behavior (hardcoded default
+                    # seniorities, no function filter, no exclusions).
+                    person_seniorities = None
+                    person_functions = None
+                    exclude_titles = None
+                    per_title_cap = 1
+                    company_cap = 1
                 else:
                     employee_ranges = None  # discovery_form doesn't collect this (out of scope, see plan)
                     icp_hint = project_meta.get("icp", "") if project_meta else ""
@@ -934,8 +994,17 @@ async def _run_pipeline(ctx: inngest.Context, step: inngest.Step) -> dict:
                                     "default": "",
                                 },
                                 "per_title_cap": {
-                                    "label": "People per company, per job title",
-                                    "default": 2, "min": 1, "max": 3,
+                                    "label": "People per cluster / job title",
+                                    "default": 1, "min": 1, "max": 50,
+                                },
+                                "company_cap": {
+                                    "label": "Total people per company (across all clusters/titles)",
+                                    "default": 1, "min": 1,
+                                    "max": config.MAX_CONTACTS_PER_COMPANY_CAP,
+                                },
+                                "include_lookalikes": {
+                                    "label": "Include similar/lookalike titles (broader match, not just the exact title)",
+                                    "default": False,
                                 },
                                 "person_locations": {
                                     "label": "Region / country (optional - blank = Global, pick as many as you like)",
@@ -943,20 +1012,74 @@ async def _run_pipeline(ctx: inngest.Context, step: inngest.Step) -> dict:
                                     "country_options": COUNTRY_OPTIONS,
                                     "default": [],
                                 },
+                                "organization_locations": {
+                                    "label": "Company HQ location (optional - city, state, or country; "
+                                    "semicolon-separated for more than one; for targeting companies "
+                                    "headquartered somewhere specific, regardless of where the contact "
+                                    "personally sits)",
+                                    "placeholder": "e.g. Austin, Texas; Bengaluru, India",
+                                    "default": "",
+                                },
+                                "icp_clusters": {
+                                    "label": "ICP cluster (optional - pick canonical Xoxoday persona "
+                                    "clusters to target; each expands into real Apollo-ready job title "
+                                    "variants, merged with anything typed above)",
+                                    "options": apollo_enrich.icp_cluster_options(),
+                                    "default": [],
+                                },
+                                "management_level": {
+                                    "label": "Management Level",
+                                    "options": apollo_enrich.SENIORITY_OPTIONS,
+                                    "default": apollo_enrich.DEFAULT_SENIORITIES,
+                                },
+                                "departments": {
+                                    "label": "Departments & Job Function (optional)",
+                                    "options": apollo_enrich.FUNCTION_OPTIONS,
+                                    "default": [],
+                                },
+                                "exclude_titles": {
+                                    "label": "Job titles to exclude (optional, comma-separated - Apollo "
+                                    "has no native exclude filter, so this drops matching candidates "
+                                    "from the results after search)",
+                                    "placeholder": "e.g. intern, assistant",
+                                    "default": "",
+                                },
                             },
                         },
                     )
                     form_answer = form_answer or {}
-                    persona_titles = [t.strip() for t in str(form_answer.get("persona_titles", "")).split(",") if t.strip()] or None
+                    manual_titles = [t.strip() for t in str(form_answer.get("persona_titles", "")).split(",") if t.strip()]
+                    cluster_keys = form_answer.get("icp_clusters") or []
+                    cluster_titles = apollo_enrich.titles_for_clusters(cluster_keys) or []
+                    persona_titles = list(dict.fromkeys(manual_titles + cluster_titles)) or None
                     try:
-                        per_title_cap = max(1, min(int(form_answer.get("per_title_cap") or 2), 3))
+                        per_title_cap = max(1, min(int(form_answer.get("per_title_cap") or 1), 50))
                     except (TypeError, ValueError):
-                        per_title_cap = 2
+                        per_title_cap = 1
+                    try:
+                        company_cap = max(1, min(int(form_answer.get("company_cap") or 1),
+                                                  config.MAX_CONTACTS_PER_COMPANY_CAP))
+                    except (TypeError, ValueError):
+                        company_cap = 1
+                    # ICP clusters expand to deliberately broad substrings (see
+                    # icp_titles.py) - exact word-set matching would miss most
+                    # real titles against them, so picking a cluster forces
+                    # lookalike mode regardless of the checkbox.
+                    exact_titles = not _truthy(form_answer.get("include_lookalikes")) and not cluster_keys
                     raw_locations = form_answer.get("person_locations")
                     if isinstance(raw_locations, str):
                         person_locations = [r.strip() for r in raw_locations.split(",") if r.strip()] or None
                     else:
                         person_locations = [str(r).strip() for r in (raw_locations or []) if str(r).strip()] or None
+                    raw_org_locations = form_answer.get("organization_locations")
+                    # Split on ";"/newline, not "," - a single HQ location is
+                    # often itself a "City, State" pair (see person_locations'
+                    # comma-split above, which is safe there since region/
+                    # country names don't normally contain internal commas).
+                    organization_locations = [r.strip() for r in re.split(r"[;\n]+", str(raw_org_locations or "")) if r.strip()] or None
+                    person_seniorities = [str(s).strip() for s in (form_answer.get("management_level") or []) if str(s).strip()] or None
+                    person_functions = [str(s).strip() for s in (form_answer.get("departments") or []) if str(s).strip()] or None
+                    exclude_titles = [t.strip() for t in str(form_answer.get("exclude_titles", "")).split(",") if t.strip()] or None
 
                 effective_per_title_cap = per_title_cap if persona_titles else None
 
@@ -964,18 +1087,21 @@ async def _run_pipeline(ctx: inngest.Context, step: inngest.Step) -> dict:
                                message=f"Searching Apollo at {len(ok_df)} accounts")
                 await _set_step(step, "step_discovery_running", run_id, "discovery", "People Discovery", "running")
 
-                async def _search():
-                    found_df, search_stats = apollo_enrich.search_candidates(
-                        ok_df, resolved_company_col, "Domain", person_locations=person_locations,
-                        persona_titles=persona_titles, max_per_company=config.MAX_CONTACTS_PER_COMPANY_CAP,
-                        per_title_cap=effective_per_title_cap, employee_ranges=employee_ranges)
-                    return _nan_safe({"records": found_df.to_dict("records"), "search_stats": search_stats})
+                # Deliberately NOT wrapped in step.run() - same pattern as
+                # reveal_phones above: search_candidates is a blocking,
+                # thread-pooled Apollo call over the full account list and can
+                # return thousands of candidate rows.
+                candidates_df, search_stats = await asyncio.to_thread(
+                    apollo_enrich.search_candidates,
+                    ok_df, resolved_company_col, "Domain", person_locations=person_locations,
+                    persona_titles=persona_titles, max_per_company=company_cap,
+                    per_title_cap=effective_per_title_cap, employee_ranges=employee_ranges,
+                    exact_titles=exact_titles, organization_locations=organization_locations,
+                    person_seniorities=person_seniorities, person_functions=person_functions,
+                    exclude_titles=exclude_titles,
+                )
 
-                search_result = await step.run("search_candidates", _search)
-                candidates_df = pd.DataFrame(search_result["records"])
-                search_stats = search_result["search_stats"]
-
-                cap_note = f" (up to {per_title_cap} per title per company)" if effective_per_title_cap else ""
+                cap_note = f" (up to {per_title_cap} per title, {company_cap} per company)" if effective_per_title_cap else ""
                 await _set_step(
                     step, "step_discovery_done", run_id, "discovery", "People Discovery", "done",
                     f"Searched {search_stats['companies_searched']} account(s), found "
@@ -995,27 +1121,37 @@ async def _run_pipeline(ctx: inngest.Context, step: inngest.Step) -> dict:
         if wizard_targeting:
             # User already confirmed targeting in the wizard - skip Claude
             # extraction and the icp_confirm_form re-ask entirely.
-            persona_titles, person_locations, employee_ranges = _targeting_from_wizard(wizard_targeting)
+            persona_titles, person_locations, employee_ranges, exact_titles, organization_locations = \
+                _targeting_from_wizard(wizard_targeting)
         else:
             persona_titles, person_locations, employee_ranges = await _extract_and_confirm_icp(
                 step, run_id, campaign_idea,
                 extract_key="icp_extract_no_csv", confirm_key="icp_confirm_no_csv",
             )
+            exact_titles = True  # no wizard toggle on this path - exact-title matching by default
+            organization_locations = None  # no HQ-location ask on the manual ICP-extraction path
 
         await _set_step(step, "step_source_done_idea", run_id, "source", "Input & Normalization", "done",
                          f"Campaign idea captured: \"{campaign_idea[:80]}\".")
 
-        companies_answer = await _ask(
-            step, run_id, "apollo_company_names", "text",
-            "Company names to search (comma-separated, or paste one per line/space-separated - "
-            "URLs are fine too):\ne.g. Acme Corp, TechCo Inc, StartUp Labs",
-            default="", context={"step": "source"},
-        )
-        company_names = _parse_company_names(str(companies_answer))
+        wizard_company_names = _company_names_from_wizard(wizard_targeting) if wizard_targeting else []
+        if wizard_company_names:
+            # Already collected in the wizard's review step - asking again
+            # would just repeat a question the user already answered.
+            company_names = wizard_company_names
+        else:
+            companies_answer = await _ask(
+                step, run_id, "apollo_company_names", "text",
+                "Company names to search (comma-separated, or paste one per line/space-separated - "
+                "URLs are fine too):\ne.g. Acme Corp, TechCo Inc, StartUp Labs",
+                default="", context={"step": "source"},
+            )
+            company_names = _parse_company_names(str(companies_answer))
         if not company_names:
             raise ValueError("No company names provided for Apollo search.")
 
-        async def _do_search(names, p_titles, p_locations, p_employee_ranges=None, key_suffix=""):
+        async def _do_search(names, p_titles, p_locations, p_employee_ranges=None, key_suffix="", exact_titles=True,
+                              p_org_locations=None):
             domains_df = pd.DataFrame([{"Company": c} for c in names])
 
             async def _resolve():
@@ -1029,16 +1165,23 @@ async def _run_pipeline(ctx: inngest.Context, step: inngest.Step) -> dict:
                 raise ValueError(f"Could not resolve domains for companies: {', '.join(names)}")
 
             async def _search():
+                # per_title_cap=2 when specific titles were requested mirrors the
+                # CSV/HubSpot-Project path's behavior, so exact_titles actually has
+                # an effect here too (search_candidates only applies it under
+                # select_candidates_per_persona) - previously this path always fell
+                # through to the generic HR-tier ranking regardless of exact_titles.
                 found_df, sstats = apollo_enrich.search_candidates(
                     resolved_df, "Company", "Domain", person_locations=p_locations,
                     persona_titles=p_titles, max_per_company=config.MAX_CONTACTS_PER_COMPANY_DEFAULT,
-                    employee_ranges=p_employee_ranges)
+                    per_title_cap=(2 if p_titles else None), employee_ranges=p_employee_ranges,
+                    exact_titles=exact_titles, organization_locations=p_org_locations)
                 return _nan_safe({"records": found_df.to_dict("records"), "search_stats": sstats})
 
             search_result = await step.run(f"search_candidates_idea{key_suffix}", _search)
             return pd.DataFrame(search_result["records"]), search_result["search_stats"]
 
-        candidates_df, search_stats = await _do_search(company_names, persona_titles, person_locations, employee_ranges)
+        candidates_df, search_stats = await _do_search(company_names, persona_titles, person_locations, employee_ranges,
+                                                          exact_titles=exact_titles, p_org_locations=organization_locations)
         await _set_step(step, "step_domain_done_idea", run_id, "domain", "Domain Resolution", "done",
                          f"Resolved domains for {len(company_names)} compan{'y' if len(company_names) == 1 else 'ies'}.")
         await _set_step(
@@ -1049,7 +1192,8 @@ async def _run_pipeline(ctx: inngest.Context, step: inngest.Step) -> dict:
         await _set_stat(step, "stat_discovery_idea", run_id, "apollo_search", search_stats)
 
         candidates_df, persona_titles, person_locations, employee_ranges = await _add_more_prospects_loop(
-            step, run_id, candidates_df, persona_titles, person_locations, employee_ranges, _do_search)
+            step, run_id, candidates_df, persona_titles, person_locations, employee_ranges, _do_search,
+            exact_titles=exact_titles, organization_locations=organization_locations)
 
         # Exclusion gate, applied to candidates - a separate small block rather
         # than sharing code with the tested exclusion block above, deliberately,
@@ -1101,6 +1245,98 @@ async def _run_pipeline(ctx: inngest.Context, step: inngest.Step) -> dict:
     needs_existing_mapping = False
 
     if has_existing_contacts:
+        # ============ ICP Filter (gated) ============
+        # Runs before any Apollo spend below, so non-ICP rows never get paid
+        # for - a sheet that already has names/titles/emails can still carry
+        # people outside the target ICP (e.g. a raw event-attendee export).
+        icp_filter_answer = await _ask(
+            step, run_id, "icp_title_filter_needed", "yes_no",
+            f"This sheet has {len(ok_df)} named contact(s). Remove anyone whose job title doesn't "
+            "match your ICP before enriching?",
+            default="yes", context={"step": "reveal"},
+        )
+        if _truthy(icp_filter_answer):
+            if input_source == "campaign_idea" and persona_titles_from_idea:
+                icp_titles = persona_titles_from_idea
+                icp_exact = exact_titles_from_idea
+            else:
+                icp_titles_answer = await _ask(
+                    step, run_id, "icp_title_filter_titles", "text",
+                    "ICP job titles to keep (comma-separated) - anyone else gets removed as non-ICP:",
+                    default="", context={"step": "reveal"},
+                )
+                icp_titles = [t.strip() for t in str(icp_titles_answer).split(",") if t.strip()]
+                icp_exact = True
+
+            title_col_for_filter = _guess_col(ok_df, ["title", "job title"])
+            if not icp_titles:
+                await _set_stat(step, "stat_icp_filter_no_titles", run_id, "icp_title_filter",
+                                 {"skipped": True, "reason": "no ICP titles provided"})
+            elif not title_col_for_filter:
+                await _set_stat(step, "stat_icp_filter_no_title_col", run_id, "icp_title_filter",
+                                 {"skipped": True, "reason": "no job-title column found in sheet"})
+            else:
+                before_count = len(ok_df)
+
+                # Deliberately NOT wrapped in step.run() - same output_too_large
+                # cap as reveal_phones above, and unlike that step this is a
+                # pure, free, in-memory pandas filter with no I/O to make
+                # replay-safe in the first place, so a step boundary buys nothing.
+                keep_mask = ok_df[title_col_for_filter].apply(
+                    lambda t: apollo_enrich.title_matches_any(str(t) if pd.notna(t) else "", icp_titles, exact=icp_exact)
+                )
+                kept_count = int(keep_mask.sum())
+                ok_df = ok_df[keep_mask].copy()
+                removed = before_count - kept_count
+                await _set_stat(step, "stat_icp_filter", run_id, "icp_title_filter",
+                                 {"removed": removed, "kept": kept_count, "titles": icp_titles, "exact": icp_exact})
+                await _set_step(
+                    step, "step_icp_filter_done", run_id, "reveal", "Email Reveal & Validation", "running",
+                    f"Removed {removed} non-ICP contact(s) by job title; {kept_count} remain.",
+                )
+        else:
+            await _set_stat(step, "stat_icp_filter_declined", run_id, "icp_title_filter", {"skipped": True})
+
+        # ============ Seniority Filter (gated) ============
+        # Same rationale as the ICP title filter above but keyed to seniority
+        # tier rather than an ICP title list - catches Associate/Executive/
+        # entry-level titles that read as below the managerial level this kit
+        # targets, without requiring the user to type an inclusion list.
+        # Opt-in and off by default so it never silently changes who gets
+        # reached out to unless asked for.
+        title_col_for_seniority = _guess_col(ok_df, ["title", "job title"])
+        seniority_col_for_filter = _guess_col(ok_df, ["seniority"])
+        if title_col_for_seniority or seniority_col_for_filter:
+            junior_mask = ok_df.apply(
+                lambda r: apollo_enrich.is_below_manager(
+                    r.get(title_col_for_seniority) if title_col_for_seniority else None,
+                    r.get(seniority_col_for_filter) if seniority_col_for_filter else None,
+                ), axis=1,
+            )
+            junior_count = int(junior_mask.sum())
+            if junior_count:
+                seniority_answer = await _ask(
+                    step, run_id, "seniority_filter_needed", "yes_no",
+                    f"{junior_count} of {len(ok_df)} contact(s) read as below managerial level "
+                    "(Associate, Executive, entry-level titles). Exclude them before enriching?",
+                    default="no", context={"step": "reveal", "below_manager": junior_count},
+                )
+                if _truthy(seniority_answer):
+                    ok_df = ok_df[~junior_mask].copy()
+                    await _set_stat(step, "stat_seniority_filter", run_id, "seniority_filter",
+                                     {"excluded": junior_count, "remaining": len(ok_df)})
+                    await _set_step(step, "step_seniority_filter_done", run_id, "reveal", "Email Reveal & Validation",
+                                     "running", f"Excluded {junior_count} below-managerial contact(s); {len(ok_df)} remain.")
+                else:
+                    await _set_stat(step, "stat_seniority_filter_declined", run_id, "seniority_filter",
+                                     {"skipped": True, "declined": True, "below_manager": junior_count})
+            else:
+                await _set_stat(step, "stat_seniority_filter_none", run_id, "seniority_filter",
+                                 {"skipped": True, "reason": "no below-managerial contacts found"})
+        else:
+            await _set_stat(step, "stat_seniority_filter_no_col", run_id, "seniority_filter",
+                             {"skipped": True, "reason": "no title/seniority column found"})
+
         await _status(step, "status_reveal_existing", run_id, stage="enriching",
                        message=f"Filling emails for {len(ok_df)} existing contact(s)")
         await _set_step(step, "step_reveal_running", run_id, "reveal", "Email Reveal & Validation", "running")
@@ -1146,15 +1382,12 @@ async def _run_pipeline(ctx: inngest.Context, step: inngest.Step) -> dict:
                        message=f"Revealing details for {len(candidates_df)} candidate(s)")
         await _set_step(step, "step_reveal_running", run_id, "reveal", "Email Reveal & Validation", "running")
 
-        async def _reveal_candidates():
-            core, _full, enrich_stats = apollo_enrich.enrich_candidates(candidates_df)
-            core = core.copy()
-            core["company_domain"] = core["search_domain"].apply(outputs.strip_url_prefix)
-            return _nan_safe({"records": core.to_dict("records"), "enrich_stats": enrich_stats})
-
-        reveal_result = await step.run("reveal_candidates", _reveal_candidates)
-        core_df = pd.DataFrame(reveal_result["records"])
-        enrich_stats = reveal_result["enrich_stats"]
+        # Deliberately NOT wrapped in step.run() - same pattern as reveal_phones
+        # above: enrich_candidates is a blocking, thread-pooled Apollo call and
+        # this is the discovery-path twin of reveal_existing_contacts.
+        core_df, _full, enrich_stats = await asyncio.to_thread(apollo_enrich.enrich_candidates, candidates_df)
+        core_df = core_df.copy()
+        core_df["company_domain"] = core_df["search_domain"].apply(outputs.strip_url_prefix)
 
         paid = enrich_stats.get("paid_lookups", enrich_stats.get("contacts_enriched", 0))
         cost = estimates.cost_block("email_reveal", paid)
@@ -1199,14 +1432,17 @@ async def _run_pipeline(ctx: inngest.Context, step: inngest.Step) -> dict:
             await _status(step, "status_phone_running", run_id, message="Revealing phone numbers")
             await _set_step(step, "step_phone_running", run_id, "phone", "Mobile Phone", "running")
 
-            async def _reveal_phones():
-                phoned_df, phone_stats = apollo_enrich.enrich_phones(
-                    core_df, f_col0, l_col0, d_col0, force_idx=phone_force)
-                return _nan_safe({"records": phoned_df.to_dict("records"), "phone_stats": phone_stats})
-
-            phone_result = await step.run("reveal_phones", _reveal_phones)
-            core_df = pd.DataFrame(phone_result["records"])
-            phone_stats = phone_result["phone_stats"]
+            # Deliberately NOT wrapped in step.run(): same "output_too_large" cap
+            # documented on _read_csv_blob above - returning the full DataFrame
+            # (7000+ rows here) as a memoized step output blows Inngest's
+            # response-size limit, which silently wedges the run at "running"
+            # forever with no catchable error. enrich_phones is also a blocking,
+            # thread-pooled Apollo call, same as enrich_existing_contacts before
+            # it - offload with asyncio.to_thread to keep it off the event loop.
+            core_df, phone_stats = await asyncio.to_thread(
+                apollo_enrich.enrich_phones,
+                core_df, f_col0, l_col0, d_col0, force_idx=phone_force,
+            )
 
             cost = estimates.cost_block("mobile_phone", phone_stats.get("phones_found", 0))
             await _accrue_cost(step, "cost_phone", run_id, cost)
@@ -1227,6 +1463,57 @@ async def _run_pipeline(ctx: inngest.Context, step: inngest.Step) -> dict:
     # Number" column the mapper would otherwise create.
     if needs_existing_mapping and not core_df.empty:
         core_df = _map_existing_contact_columns(core_df, resolved_first_col, resolved_last_col, resolved_company_col)
+
+        # ============ Fill Missing Details (existing-contact sheets only, gated) ============
+        # The discovered-candidates path already captures LinkedIn/company/
+        # seniority via enrich_candidates' full Apollo response - this gap
+        # only exists for a sheet that came in already named/emailed, where
+        # enrich_existing_contacts only ever kept the email field.
+        #
+        # count_missing_details free-checks Apollo's bulk_match-by-email tier
+        # live before counting a row against the paid estimate (network call,
+        # so it's wrapped in step.run() like any other non-deterministic work).
+        async def _count_missing_details():
+            return apollo_enrich.count_missing_details(core_df)
+
+        missing_details_count = await step.run("count_missing_details", _count_missing_details)
+        if missing_details_count == 0:
+            await _set_stat(step, "stat_details_no_gaps", run_id, "existing_contact_details",
+                             {"skipped": True, "reason": "no missing details", "missing": 0})
+        else:
+            details_est = estimates.cost_block("existing_contact_details", missing_details_count)
+            details_answer = await _ask(
+                step, run_id, "fill_missing_details_needed", "yes_no",
+                f"{missing_details_count} contact(s) are missing details like LinkedIn URL, company LinkedIn, "
+                f"industry, seniority, or department (after checking Apollo's free bulk-match-by-email tier "
+                f"first). Fill them via Apollo (~{details_est['credits']} credits, ${details_est['usd']})?",
+                default="yes", context={"step": "reveal", "estimate": details_est, "missing": missing_details_count},
+            )
+            if _truthy(details_answer):
+                await _status(step, "status_filling_details", run_id,
+                               message=f"Filling missing details for {missing_details_count} contact(s)")
+
+                # Deliberately NOT wrapped in step.run() - same pattern as
+                # reveal_phones above: blocking, thread-pooled Apollo call over
+                # the full contact list.
+                core_df, details_stats = await asyncio.to_thread(
+                    apollo_enrich.fill_missing_details,
+                    core_df, resolved_first_col, resolved_last_col, "Domain",
+                )
+
+                details_cost = estimates.cost_block("existing_contact_details", details_stats.get("paid_lookups", 0))
+                await _accrue_cost(step, "cost_fill_details", run_id, details_cost)
+                await _set_stat(step, "stat_details_filled", run_id, "existing_contact_details", details_stats)
+                await _set_step(
+                    step, "step_details_done", run_id, "reveal", "Email Reveal & Validation", "done",
+                    f"Filled {details_stats.get('fields_filled', 0)} missing detail field(s) across "
+                    f"{details_stats.get('free_lookups', 0)} free lookup(s) + {details_stats.get('paid_lookups', 0)} "
+                    "paid lookup(s).",
+                    cost=details_cost,
+                )
+            else:
+                await _set_stat(step, "stat_details_declined", run_id, "existing_contact_details",
+                                 {"skipped": True, "reason": "declined by user", "missing": missing_details_count})
 
     # ============ Completeness fill (deferred - only worth asking once we know the real gap count) ============
     completeness_cols = [
@@ -1264,13 +1551,13 @@ async def _run_pipeline(ctx: inngest.Context, step: inngest.Step) -> dict:
             await _status(step, "status_completeness_running", run_id,
                            message=f"Filling {gap_count} completeness gap(s) via web search")
 
-            async def _fill_completeness():
-                filled_df, completeness_stats = web_completeness.fill_completeness_gaps(accounts_processed, resolved_company_col)
-                return _nan_safe({"records": filled_df.to_dict("records"), "completeness_stats": completeness_stats})
-
-            fill_result = await step.run("fill_completeness_gaps", _fill_completeness)
-            accounts_processed = pd.DataFrame(fill_result["records"])
-            await _set_stat(step, "stat_completeness_filled", run_id, "completeness", fill_result["completeness_stats"])
+            # Deliberately NOT wrapped in step.run() - same pattern as
+            # reveal_phones above: fill_completeness_gaps makes sequential
+            # blocking Anthropic web-search calls, one per account with a gap.
+            accounts_processed, completeness_stats = await asyncio.to_thread(
+                web_completeness.fill_completeness_gaps, accounts_processed, resolved_company_col,
+            )
+            await _set_stat(step, "stat_completeness_filled", run_id, "completeness", completeness_stats)
         else:
             await _set_stat(step, "stat_completeness_declined", run_id, "completeness",
                              {"skipped": True, "reason": "declined by user", "gaps": gap_count})
@@ -1287,6 +1574,11 @@ async def _run_pipeline(ctx: inngest.Context, step: inngest.Step) -> dict:
         default=suggested_title, context={"step": "outputs"},
     )
     campaign_title = str(campaign_title).strip() or suggested_title
+    # Stored so the file-download route can prefix downloaded filenames with
+    # it (e.g. "P0_ABM_..._email_upload.csv" instead of a bare
+    # "email_upload.csv") - otherwise a user with several runs open has no
+    # way to tell which campaign a downloaded file belongs to.
+    await _set_stat(step, "stat_campaign_title", run_id, "campaign_title", campaign_title)
 
     await _status(step, "status_assembling_outputs", run_id, stage="assembling_outputs", message="Writing output files")
     await _set_step(step, "step_outputs_running", run_id, "outputs", "Output Files & Name", "running")
@@ -1488,6 +1780,20 @@ async def _run_pipeline(ctx: inngest.Context, step: inngest.Step) -> dict:
 
     heyreach_result = await step.run("heyreach_push", _push_heyreach)
     import_result["heyreach"] = heyreach_result
+
+    async def _push_interakt():
+        if outputs.file_exists(run_dir, "whatsapp_upload.csv"):
+            try:
+                wa_df = pd.read_csv(io.BytesIO(outputs.read_file(run_dir, "whatsapp_upload.csv")))
+            except pd.errors.EmptyDataError:
+                wa_df = pd.DataFrame()
+            if not wa_df.empty:
+                wa_df = wa_df.where(pd.notna(wa_df), None)
+                return _nan_safe(interakt.push_users(wa_df.to_dict(orient="records"), campaign_title))
+        return {"status": "skipped"}
+
+    interakt_result = await step.run("interakt_push", _push_interakt)
+    import_result["interakt"] = interakt_result
 
     await _set_step(step, "step_copy_agent_running", run_id, "copy_agent", "Copy Agent", "running")
     await _status(step, "status_generating_copy", run_id, message="Generating campaign copy")
