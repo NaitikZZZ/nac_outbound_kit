@@ -127,6 +127,7 @@ Combined with POC name: `Naitik25AUG26`, `GauravNaitik25AUG26`.
 | `P2_PRTNR_FUNDING_US_EMAIL_Neha20MAR26` | Partnership, Funding trigger, US, Email, Neha, Medium, Mar 20 2026 |
 | `P3_API_ENT500_UKEU_EMAIL-LI_Sam01JUN26` | API, Employee 500+, UK/EU, Email + LinkedIn, Sam, Low, Jun 1 2026 |
 | `P1_ABM_POSTEVENT_IND_WA-CALL_Priya20APR26` | ABM, Post-event, India, WhatsApp + Call, Priya, High, Apr 20 2026 |
+| `P2_ABM_POSTEVENT_IND_WA_Priya05MAR26` | ABM, Post-event, India, WhatsApp only (Interakt), Priya, Medium, Mar 5 2026 |
 | `P0_EVENTS_DREAM_US_EMAIL-LI_RahulPriya05JAN26` | Events, Dream accounts, US, Email + LinkedIn, Rahul + Priya (co-own), Critical, Jan 5 2026 |
 | `P0_ABM_API-HealthandWellness_GLOBAL_EMAIL-LI_GauravNaitik25AUG26` | ABM, custom use case, Global, Email + LinkedIn, Gaurav + Naitik (co-own), Critical, Aug 25 2026 |
 

@@ -52,9 +52,9 @@ Full product details in `reference/xoxoday-products.md`.
 ## Standard Workflow
 
 ### Step -1: Choose the agent
-Before anything else, ask the user which agent they want:
-- **Data Agent** - the full raw-leads-to-campaign pipeline (enrich, segment, write copy, launch). Continue to Step 0 below.
-- **Campaign Push Agent** - push an already-prepared file straight to a platform, no enrichment. Jump to "Campaign Push Agent Workflow" below and skip the rest of this section.
+Before anything else, ask the user: **Enrich the data**, or **Push copy to sequence**?
+- **Enrich the data** - the full raw-leads-to-campaign pipeline (enrich, segment, write copy, launch). Continue to Step 0 below.
+- **Push copy to sequence** - the user already has a list (leads) and finished copy (email/LinkedIn/WhatsApp) ready; the job is to normalize the list and push the copy into Smartlead, HeyReach, and/or Interakt. No enrichment, segmentation, or copywriting happens here. Jump to "Campaign Push Agent Workflow" below and skip the rest of this section.
 
 ### Step 0: Understand the request
 Ask the user:
@@ -160,17 +160,21 @@ Present to the user:
 
 ## Campaign Push Agent Workflow
 
-Used when the user picks **Campaign Push Agent** in Step -1 above. Assumes the file(s) the user hands over are already enriched, segmented, verified, and the copy is final - this agent only pushes to the platform(s), it does not run any of the Data Agent steps above.
+Used when the user picks **Push copy to sequence** in Step -1 above. The user already has a list and finished copy - this agent's job is to normalize the list and push the copy to the platform(s). It does not run enrichment, segmentation, ZeroBounce, or copywriting - those are Data Agent steps.
 
-### Step A: Which platform(s)?
-Ask the user: Smartlead, HeyReach, or both?
+### Step A: Normalize the list (always, no exceptions)
+Run the [csv-normalizer](.claude/skills/csv-normalizer) skill on every leads file handed over, regardless of platform, even though enrichment is skipped. Normalization is not enrichment - it's mandatory cleanup (name splitting, legal-suffix stripping, casing fixes, whitespace/location standardization) that must happen on every list before it touches any platform. Do this before Step B.
 
-### Step B: Get the file(s) and push
-- **Smartlead selected** - ask for the leads CSV and the sequence JSON (see the `sequence.json format` under Smartlead Details below). Confirm the campaign name follows the naming convention, then run `scripts/06_smartlead_create_campaign.py`. Leaves the campaign PAUSED for review (Critical Rule #6 still applies).
-- **HeyReach selected** - ask for the leads CSV (must have a `linkedin_url` column). Confirm the list/campaign name follows the naming convention, then run `scripts/07_heyreach_create_list.py` to create the list and load leads. If a full cadence should go live too (not just the list), also run `scripts/17_heyreach_push_campaign.py` with a copy JSON - leaves the campaign in DRAFT.
-- **Both selected** - do the above for each platform, one file per platform (a Smartlead leads CSV and a HeyReach leads CSV can have different columns - ask for each separately). Use the same POC/date token and a `EMAIL-LI` channel tag in both names per the naming convention.
+### Step B: Which platform(s)?
+Ask the user: Smartlead, HeyReach, Interakt, or any combination.
 
-Do not run enrichment, segmentation, ZeroBounce, or copy generation in this path. If the file the user hands over looks unverified or clearly still needs enrichment (missing emails/LinkedIn URLs, no segment column), flag it to the user before pushing rather than pushing anyway.
+### Step C: Get the file(s) and push
+- **Smartlead selected** - ask for the normalized leads CSV and the sequence JSON (see the `sequence.json format` under Smartlead Details below). Confirm the campaign name follows the naming convention, then run `scripts/06_smartlead_create_campaign.py`. Leaves the campaign PAUSED for review (Critical Rule #6 still applies).
+- **HeyReach selected** - ask for the normalized leads CSV (must have a `linkedin_url` column). Confirm the list/campaign name follows the naming convention, then run `scripts/07_heyreach_create_list.py` to create the list and load leads. If a full cadence should go live too (not just the list), also run `scripts/17_heyreach_push_campaign.py` with a copy JSON - leaves the campaign in DRAFT.
+- **Interakt selected** - ask for the normalized leads CSV and the WhatsApp template/copy. Confirm the campaign/list name follows the naming convention (`WA` channel tag), then push leads with `scripts/interakt_push_leads.py` and send with `scripts/interakt_send_template.py`.
+- **Multiple platforms selected** - do the above for each platform, one file per platform (a Smartlead leads CSV, a HeyReach leads CSV, and an Interakt leads CSV can have different columns - ask for each separately). Use the same POC/date token and the right multi-channel tag (e.g. `EMAIL-LI`, `EMAIL-LI-WA`) in every name per the naming convention.
+
+Do not run enrichment, segmentation, ZeroBounce, or copy generation in this path - Step A's normalization is the one required exception. If the file the user hands over is missing required columns even after normalization (emails/LinkedIn URLs, no segment column), flag it to the user before pushing rather than pushing anyway.
 
 ---
 
