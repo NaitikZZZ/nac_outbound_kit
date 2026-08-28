@@ -99,6 +99,11 @@ def _guess_col(df: pd.DataFrame, candidates: list[str]) -> str | None:
 # actually decides which column wins when a sheet has several.
 _EMAIL_COL_CANDIDATES = ["final work email", "work email", "email address", "email"]
 
+# "linkedinurl" first so an exact-match hit (e.g. a HeyReach export's
+# "linkedinUrl") wins before substring fallback ever risks matching
+# "company_linkedinUrl" instead - see the linkedin_url passthrough below.
+_LINKEDIN_COL_CANDIDATES = ["linkedinurl", "linkedin url", "person linkedin url", "linkedin profile url", "linkedin"]
+
 
 def _blank_domain_mask(df: pd.DataFrame) -> pd.Series:
     if "Domain" not in df.columns:
@@ -809,6 +814,17 @@ async def _run_pipeline(ctx: inngest.Context, step: inngest.Step) -> dict:
         if "Domain" not in df.columns:
             df["Domain"] = None
         df["Domain"] = df["Domain"].apply(lambda v: outputs.strip_url_prefix(v) if pd.notna(v) else v)
+
+        # A sheet that already carries LinkedIn URLs under a differently-named
+        # column (e.g. a HeyReach export's "linkedinUrl") must not lose them -
+        # outputs.build_channel_files only ever reads the exact "linkedin_url"
+        # column, and Apollo enrichment only fills it in when blank (and needs
+        # a domain to do so), so without this passthrough a sheet with real,
+        # ready-to-use LinkedIn URLs produced 0 rows in every channel output
+        # whenever domain resolution was skipped.
+        existing_linkedin_col = "linkedin_url" if "linkedin_url" in df.columns else _guess_col(df, _LINKEDIN_COL_CANDIDATES)
+        if existing_linkedin_col and existing_linkedin_col != "linkedin_url":
+            df["linkedin_url"] = df[existing_linkedin_col]
 
         missing_mask = _blank_domain_mask(df)
         missing_count = int(missing_mask.sum())
