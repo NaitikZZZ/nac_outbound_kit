@@ -51,6 +51,11 @@ Full product details in `reference/xoxoday-products.md`.
 
 ## Standard Workflow
 
+### Step -1: Choose the agent
+Before anything else, ask the user which agent they want:
+- **Data Agent** - the full raw-leads-to-campaign pipeline (enrich, segment, write copy, launch). Continue to Step 0 below.
+- **Campaign Push Agent** - push an already-prepared file straight to a platform, no enrichment. Jump to "Campaign Push Agent Workflow" below and skip the rest of this section.
+
 ### Step 0: Understand the request
 Ask the user:
 - Which product is this for? (Plum / Empuls / Loyalife)
@@ -150,6 +155,22 @@ Present to the user:
 - Credits consumed per tool
 - Campaign IDs / list IDs
 - Next steps (review in platform, flip from paused to live, import to HubSpot)
+
+---
+
+## Campaign Push Agent Workflow
+
+Used when the user picks **Campaign Push Agent** in Step -1 above. Assumes the file(s) the user hands over are already enriched, segmented, verified, and the copy is final - this agent only pushes to the platform(s), it does not run any of the Data Agent steps above.
+
+### Step A: Which platform(s)?
+Ask the user: Smartlead, HeyReach, or both?
+
+### Step B: Get the file(s) and push
+- **Smartlead selected** - ask for the leads CSV and the sequence JSON (see the `sequence.json format` under Smartlead Details below). Confirm the campaign name follows the naming convention, then run `scripts/06_smartlead_create_campaign.py`. Leaves the campaign PAUSED for review (Critical Rule #6 still applies).
+- **HeyReach selected** - ask for the leads CSV (must have a `linkedin_url` column). Confirm the list/campaign name follows the naming convention, then run `scripts/07_heyreach_create_list.py` to create the list and load leads. If a full cadence should go live too (not just the list), also run `scripts/17_heyreach_push_campaign.py` with a copy JSON - leaves the campaign in DRAFT.
+- **Both selected** - do the above for each platform, one file per platform (a Smartlead leads CSV and a HeyReach leads CSV can have different columns - ask for each separately). Use the same POC/date token and a `EMAIL-LI` channel tag in both names per the naming convention.
+
+Do not run enrichment, segmentation, ZeroBounce, or copy generation in this path. If the file the user hands over looks unverified or clearly still needs enrichment (missing emails/LinkedIn URLs, no segment column), flag it to the user before pushing rather than pushing anyway.
 
 ---
 
