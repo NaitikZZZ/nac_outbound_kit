@@ -622,14 +622,46 @@ def clean_person_name(raw):
     return name, flags
 
 
+_INITIAL_VOWELS = set("aeiouy")  # "y" counts as a vowel so real short names
+# like "Lynn" or "Kim" aren't mistaken for initials.
+
+
+def _looks_like_initials(token):
+    """True for a token that reads as initials rather than a usable first
+    name: a single letter (with or without a trailing period, e.g. "S."),
+    or a short (2-5 letter) vowel-less run of letters (e.g. "KMG")."""
+    t = token.strip(". ")
+    if not t or not t.isalpha():
+        return False
+    if len(t) == 1:
+        return True
+    return 2 <= len(t) <= 5 and not any(c.lower() in _INITIAL_VOWELS for c in t)
+
+
+def _looks_like_a_name(text):
+    """True if `text` reads as an actual name rather than initials/junk -
+    has at least one vowel and at least 2 letters."""
+    letters = re.sub(r"[^A-Za-z]", "", text or "")
+    return len(letters) >= 2 and any(c.lower() in _INITIAL_VOWELS for c in letters)
+
+
 def split_name(full):
-    """First = leading token. Last = the rest (keeps particles and compounds intact)."""
+    """First = leading token. Last = the rest (keeps particles and compounds intact).
+
+    If the leading token reads as initials (e.g. "S." or "KMG") and the next
+    token reads like an actual name, swap them first - "Hi S.," reads badly
+    when the usable name ("Yasmin") is sitting right next to it.
+    """
     toks = [t for t in full.split(" ") if t]
     if not toks:
-        return "", ""
+        return "", "", []
     if len(toks) == 1:
-        return toks[0], ""
-    return toks[0], " ".join(toks[1:])
+        return toks[0], "", []
+    flags = []
+    if _looks_like_initials(toks[0]) and _looks_like_a_name(toks[1]):
+        toks[0], toks[1] = toks[1], toks[0]
+        flags.append("initials_first_name_swapped")
+    return toks[0], " ".join(toks[1:]), flags
 
 
 # --------------------------------------------------------------------------
@@ -678,6 +710,21 @@ def case_company(s):
     return " ".join(_case_company_token(t, i == 0, caps) for i, t in enumerate(toks))
 
 
+def dedupe_linkedin_pipe_noise(s):
+    """A LinkedIn-scraped company field often looks like "A2MP | Africa
+    Minerals and Metals Processing Platform | LinkedIn" - an acronym, its
+    full expansion, and the site name, pipe-separated. Drop the "LinkedIn"
+    segment and keep the longest remaining one (the expanded, readable name)
+    instead of the acronym."""
+    if "|" not in s:
+        return s, False
+    segments = [seg.strip() for seg in s.split("|") if seg.strip() and seg.strip().lower() != "linkedin"]
+    if not segments:
+        return s, False
+    longest = max(segments, key=len)
+    return longest, longest != s.strip()
+
+
 def clean_company(raw, strip_the=False, strip_tagline=False, strip_geo=False):
     """Return (clean_company, flags)."""
     flags = []
@@ -687,6 +734,10 @@ def clean_company(raw, strip_the=False, strip_tagline=False, strip_geo=False):
         return "", ["company_empty"] if raw and str(raw).strip() else []
 
     original = s
+
+    s, deduped = dedupe_linkedin_pipe_noise(s)
+    if deduped:
+        flags.append("linkedin_pipe_noise_removed")
 
     if QUALITY_MARKER_RE.search(s):
         flags.append("quality_marker_removed")
@@ -1035,9 +1086,13 @@ def main():
 
             full_clean, nf = clean_person_name(source)
             flags.extend(nf)
-            first, last = split_name(full_clean)
-            # Trust an explicit, single-token last-name column over the split.
-            if raw_last.strip() and full_clean:
+            first, last, sf = split_name(full_clean)
+            flags.extend(sf)
+            # Trust an explicit, single-token last-name column over the split,
+            # unless the split already swapped an initials-only first name in -
+            # in that case the raw last-name column is the initials we just
+            # moved out of the way, not a correction.
+            if not sf and raw_last.strip() and full_clean:
                 lc, lf = clean_person_name(raw_last)
                 if lc and lc.lower() != last.lower() and lc.lower() in full_clean.lower():
                     last = lc
