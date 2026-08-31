@@ -448,6 +448,8 @@ COLUMN_ALIASES = OrderedDict([
                "business email", "email_address"]),
     ("title", ["title", "job title", "position", "role", "designation",
                "job_title", "current title"]),
+    ("website", ["website", "domain", "company domain", "company website",
+                 "company url", "url"]),
 ])
 
 
@@ -829,6 +831,52 @@ def clean_company(raw, strip_the=False, strip_tagline=False, strip_geo=False):
     return s, sorted(set(flags))
 
 
+# Domains where the value is a personal mailbox, not a company - never a
+# useful signal for a company/domain comparison.
+FREE_EMAIL_DOMAINS = {
+    "gmail.com", "googlemail.com", "yahoo.com", "yahoo.co.in", "ymail.com",
+    "hotmail.com", "outlook.com", "live.com", "msn.com", "icloud.com",
+    "me.com", "aol.com", "protonmail.com", "proton.me", "rediffmail.com",
+    "zoho.com", "gmx.com", "mail.com",
+}
+
+
+def company_domain_overlap(company, website, min_token_len=3):
+    """True/False if company and website share plausible overlap, None if
+    there's nothing worth comparing (blank value, or a personal mailbox
+    domain). Not a correction - a domain reflecting a parent/subsidiary,
+    rebrand, or unrelated marketing domain is common and doesn't mean the
+    typed company name is wrong (see Aon / globalinsurance.co.in in a real
+    ABM batch: trusting the domain there would have renamed Aon). This only
+    flags the row for a human glance, it never changes the company value.
+
+    Checked per-word rather than as one string, so an abbreviated or
+    rebranded domain ("Kashiv Biosciences" -> kashivpharma.com, "Tcg
+    Lifesciences" -> tcgls.com) counts as related instead of flooding the
+    flag with legitimate names - only a token that shares nothing with the
+    domain at all (Aon / globalinsurance.co.in) is flagged.
+    """
+    if not company or not website:
+        return None
+    d = str(website).strip().lower()
+    d = re.sub(r"^https?://", "", d)
+    d = re.sub(r"^www\.", "", d)
+    d = d.split("/")[0]
+    if not d or d in FREE_EMAIL_DOMAINS:
+        return None
+    label = d.split(".")[0]
+    if not label:
+        return None
+    tokens = [re.sub(r"[^a-z0-9]", "", t.lower()) for t in str(company).split()]
+    tokens = [t for t in tokens if len(t) >= min_token_len and t not in COMPANY_STOPWORDS]
+    if not tokens:
+        co_letters = re.sub(r"[^a-z0-9]", "", str(company).lower())
+        if not co_letters:
+            return None
+        return label in co_letters or co_letters in label
+    return any(t in label or label in t for t in tokens)
+
+
 # --------------------------------------------------------------------------
 # Locations
 # --------------------------------------------------------------------------
@@ -1135,6 +1183,10 @@ def main():
             flags.extend(cf)
             if co and co != clean_ws(raw_co):
                 changed["company"] += 1
+            if "website" in cols:
+                overlap = company_domain_overlap(co, row.get(cols["website"], ""))
+                if overlap is False:
+                    flags.append("company_domain_mismatch")
 
         # ---- location ----
         city = state = country = ""
