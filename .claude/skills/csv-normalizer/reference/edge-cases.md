@@ -45,6 +45,8 @@ refuses to guess and writes a marker into `Normalization Flags`.
 | 2.8 | Full name sitting in the First Name column | `First Name = "John Smith"`, Last blank | **Flag** `full_name_in_first_name_column`, split anyway |
 | 2.9 | Only First + Last, no Full | | Full Name synthesized from both |
 | 2.10 | Explicit Last Name column disagrees with the split | | Explicit value wins if it appears in the full name |
+| 2.10a | First Name column holds the whole name, Last Name is a duplicated fragment | `First = "Ombir Singh"`, `Last = "Singh"` | Recombined and re-split correctly: `Ombir` / `Singh` |
+| 2.10b | Initials-only first name with the real name in the other slot | `S. Yasmin`, `KMG Stephen` | Swapped so the real name leads: `Yasmin` / `S.`, `Stephen` / `KMG`. Short real names (`Lynn`, `Kim`) are protected by treating `y` as a vowel |
 
 ### Noise to strip
 
@@ -94,6 +96,7 @@ refuses to guess and writes a marker into `Normalization Flags`.
 | 3.2 | Trailing period after suffix | `Reyes Holdings, L.l.c.` | Stripped |
 | 3.3 | Stacked suffixes | `Acme Holdings Pvt. Ltd. Co.` | All stripped, up to 4 passes |
 | 3.4 | Indian | `Pvt Ltd`, `Pvt. Ltd.`, `Private Limited` | Stripped |
+| 3.4a | Truncated Indian suffix, `Limited` missing | `Acme Solutions Private`, `Acme Pvt` | Stripped — a common export truncation, not just the full phrase |
 | 3.5 | Singapore / Malaysia / Australia | `Pte Ltd`, `Sdn Bhd`, `Pty Ltd` | Stripped |
 | 3.6 | German / Dutch / Nordic | `GmbH`, `AG`, `BV`, `NV`, `AB`, `A/S`, `ApS`, `Oy` | Stripped |
 | 3.7 | Romance | `S.A.`, `SAS`, `SARL`, `SRL`, `SpA`, `Ltda`, `S.A. de C.V.` | Stripped |
@@ -124,6 +127,7 @@ refuses to guess and writes a marker into `Normalization Flags`.
 | --- | --- | --- | --- |
 | 3.23 | ALL CAPS | `IDEAL INDUSTRIES` | Ideal Industries |
 | 3.24 | ALL CAPS containing an acronym | `FMFE, CPA, P.C.` | `FMFE, CPA` — short non-word tokens stay uppercase |
+| 3.24a | ALL CAPS where a short token is a real word, not an acronym | `VODAFONE IDEA` | `Vodafone Idea` — `IDEA` is in the common-word list, so it isn't mistaken for an acronym like `FMFE` |
 | 3.25 | ALL CAPS ordinary short word | `OLD WORLD INDUSTRIES` | Old World Industries |
 | 3.26 | Alphanumeric acronym | `D4C DENTAL BRANDS` | D4C Dental Brands |
 | 3.27 | Known acronym in any case | `ibm`, `kpmg`, `pwc`, `at&t` | IBM, KPMG, PwC, AT&T |
@@ -135,6 +139,8 @@ refuses to guess and writes a marker into `Normalization Flags`.
 | 3.33 | Internal stopwords | `BANK OF THE WEST` | `Bank of the West` |
 | 3.34 | HTML entity | `Johnson &amp; Johnson` | `Johnson & Johnson` |
 | 3.35 | Emoji / trademark glyph | `Acme 🚀`, `Acme™` | Removed |
+| 3.35a | LinkedIn-scrape pipe noise | `A2MP \| Africa Minerals and Metals Processing Platform \| LinkedIn` | `LinkedIn` segment dropped, longest remaining segment kept (the expanded name, not the acronym): `Africa Minerals & Metals Processing Platform` |
+| 3.35b | Double-mangled `®` that lost real information (confirmed against a real file's raw bytes) | `Great Place To Workâ®` | Stripped outright — not a guessed restoration, a known-corrupted sequence |
 | 3.36 | Wrapping quotes | `"Acme Inc"` | Unwrapped |
 | 3.37 | Leading `The` | `The Home Depot` | **Kept** by default. `--strip-the` opts in |
 | 3.38 | Marketing tagline | `Stripe \| Payments Infrastructure` | **Kept** by default. `--strip-tagline` opts in |
@@ -143,6 +149,7 @@ refuses to guess and writes a marker into `Normalization Flags`.
 | 3.41 | Quality marker, trailing | `Acme - DO NOT USE` | Removed |
 | 3.42 | Marker word that is really part of the name | `Old Dominion University`, `Avalon Test Equipment` | **Preserved.** Bare mid-name matches are never stripped |
 | 3.43 | Bare domain in the company column | `acme-widgets.com`, `Tns.org` | `Acme Widgets`, `Tns`, **flag** `derived_from_domain` — verify these |
+| 3.43a | Real brand name that happens to use a startup-style TLD | `Examroom.ai`, `Notion.so`, `Linear.app` | **Kept as-is**, not compressed to `Examroom` — an explicit `http(s)://` or `www.` prefix still forces compression regardless of TLD, since that's a strong signal it's a pasted link rather than a typed name |
 | 3.44 | Diacritics | `Nestlé S.A.` | `Nestlé` |
 | 3.45 | Very long value | over 60 chars | **Flag** `company_unusually_long`, often a tagline or a description |
 | 3.46 | Non-Latin script | `株式会社エイコー` | Left as-is |
@@ -226,7 +233,39 @@ this normalizer.
 
 ---
 
-## 7. Deliberately out of scope
+## 7. Company / domain mismatch — QA flag only, never a correction
+
+When a `Website` or `Domain` column is present alongside the company column,
+each row's cleaned company name is checked against that domain. If they
+share no real word in common, the row gets flag `company_domain_mismatch` —
+nothing about the company value is ever changed by this check.
+
+This exists because a domain often legitimately diverges from the company
+name — a subsidiary's domain, a rebrand, an abbreviated slug — and blindly
+trusting the domain would be actively wrong. A real ABM batch had `Aon` with
+domain `globalinsurance.co.in` (a regional insurance subsidiary's domain,
+not Aon's); auto-correcting to the domain there would have silently renamed
+a Fortune 500 company in outbound copy.
+
+| # | Case | Example | Result |
+| --- | --- | --- | --- |
+| 7.1 | Genuine mismatch | `Aon` / `globalinsurance.co.in` | **Flag** `company_domain_mismatch` |
+| 7.2 | Domain matches company | `Aon` / `aonhewitt.com` | Not flagged — `aon` is a substring of the domain |
+| 7.3 | Abbreviated/rebranded domain, still related | `Kashiv Biosciences` / `kashivpharma.com`, `Tcg Lifesciences` / `tcgls.com` | Not flagged — checked per-word, not as one string, so a shared token (`kashiv`, `tcg`) counts as related |
+| 7.4 | Personal mailbox domain | `gmail.com`, `yahoo.com`, etc. | Never compared — not a company signal |
+| 7.5 | No Website/Domain column present | | Check skipped entirely |
+| 7.6 | Company itself was derived from the domain (no company column at all) | | Check skipped — comparing a value to the thing it was derived from is meaningless |
+
+On the real Diwali batch this file was built against: a first pass comparing
+whole strings flagged **20.5%** of rows (mostly false positives — legitimate
+companies with abbreviated domains). The per-word check above brought that
+down to **7.9%** while still catching Aon and Zoho. Expect a similar order of
+magnitude on other lists — this is a broad net for a human skim, not a
+precise "these rows are wrong" list.
+
+---
+
+## 8. Deliberately out of scope
 
 These are separate jobs. Doing them inside a normalizer silently changes row
 counts, which breaks the one guarantee this script makes.

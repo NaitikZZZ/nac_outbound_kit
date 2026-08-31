@@ -58,9 +58,10 @@ the flagged rows and fix by hand or by LLM pass. Priority order:
 - `company_empty_after_clean` — cleaning consumed the whole value
 - `suffix_is_whole_name_kept` — the legal suffix *was* the name (`The Limited`)
 - `derived_from_domain` — company column held a bare domain
+- `company_domain_mismatch` — company name shares no word with its `Website`/`Domain` column (only checked if that column exists); a broad QA net, not a correction — see `reference/edge-cases.md` §7 before treating every flagged row as wrong
 - `country_unmapped` / `state_unmapped` — extend the lookup tables in the script
 
-`mononym` and `legal_suffix_removed` are informational and usually need no action.
+`mononym`, `legal_suffix_removed`, and `initials_first_name_swapped` are informational and usually need no action.
 
 ## Phone numbers are not touched
 
@@ -107,7 +108,8 @@ mixed-case, which is a deliberate signal, so they are left alone.
 
 Within an ALL-CAPS source, short tokens that are not ordinary English words are
 kept uppercase as acronyms: `FMFE, CPA, P.C.` becomes `FMFE, CPA`, while
-`OLD WORLD INDUSTRIES` becomes `Old World Industries`.
+`OLD WORLD INDUSTRIES` becomes `Old World Industries` and `VODAFONE IDEA`
+becomes `Vodafone Idea` (`IDEA` is a real word, not an acronym).
 
 ## Location resolution order
 
@@ -134,6 +136,9 @@ deterministic and repeatable, and an LLM will quietly drop rows on long lists.
 
 All vocabulary lives in module-level constants at the top of `normalize.py`:
 `LEGAL_SUFFIXES`, `BRAND_CASE`, `ACRONYMS`, `HONORIFICS`, `NAME_SUFFIXES`,
-`COUNTRY_CANON`, `CITY_CANON`, `NON_LOCATIONS`, `COLUMN_ALIASES`. Add entries
-there rather than writing new regexes. After any edit, re-run against
+`COUNTRY_CANON`, `CITY_CANON`, `NON_LOCATIONS`, `COLUMN_ALIASES`,
+`COMMON_SHORT_WORDS` (real words that must never be mistaken for an
+acronym), `BRAND_STYLE_TLDS` (`.ai`/`.io`/`.app`/... TLDs treated as part of
+a brand name, not a pasted domain). Add entries there rather than writing
+new regexes. After any edit, re-run against
 `outputs/apollo-contacts-okay-to-reach-out.csv` and diff the flag histogram.
