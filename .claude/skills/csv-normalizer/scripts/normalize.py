@@ -140,6 +140,9 @@ LEGAL_SUFFIXES = [
     "gesellschaft mit beschrankter haftung", "besloten vennootschap",
     "naamloze vennootschap", "aktiebolag", "osakeyhtio", "societe anonyme",
     "sociedad anonima", "sociedade anonima", "private limited", "proprietary limited",
+    # Bare "private"/"pvt" with no "limited" attached - a common truncation
+    # in scraped/exported Indian company names ("Acme Solutions Private").
+    "private", "pvt.", "pvt",
     "pvt. ltd.", "pvt ltd.", "pvt. ltd", "pvt ltd", "pte. ltd.", "pte ltd.",
     "pte. ltd", "pte ltd", "pty. ltd.", "pty ltd.", "pty. ltd", "pty ltd",
     "sdn. bhd.", "sdn bhd", "co., ltd.", "co. ltd.", "co ltd", "co.,ltd",
