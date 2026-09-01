@@ -298,6 +298,8 @@ COMMON_SHORT_WORDS = {
     "ghana", "haiti", "italy", "japan", "kenya", "libya", "malta", "nauru",
     "nepal", "niger", "palau", "qatar", "spain", "sudan", "tonga", "yemen",
     "congo", "korea",
+    # Short Indian city/state names, same collision as country names above.
+    "pune", "goa", "agra", "kota", "puri", "diu", "club",
 }
 
 # --------------------------------------------------------------------------
