@@ -291,6 +291,13 @@ COMMON_SHORT_WORDS = {
     "soft", "solo", "span", "spot", "sure", "team", "time", "tree", "unit",
     "vast", "well", "wide", "wild", "wood", "yard", "your", "auto", "with",
     "from", "into", "over", "more", "less", "each", "both", "some", "such",
+    # Country/continent names short enough to collide with the acronym
+    # threshold - "XYZ IRAN OPERATIONS" must not keep "IRAN" uppercase.
+    "asia", "chad", "cuba", "fiji", "iran", "iraq", "laos", "mali", "oman",
+    "peru", "togo", "truck", "india", "china", "chile", "egypt", "gabon",
+    "ghana", "haiti", "italy", "japan", "kenya", "libya", "malta", "nauru",
+    "nepal", "niger", "palau", "qatar", "spain", "sudan", "tonga", "yemen",
+    "congo", "korea",
 }
 
 # --------------------------------------------------------------------------
