@@ -35,7 +35,22 @@ import sys
 import unicodedata
 from pathlib import Path
 
-import pandas as pd
+
+class _LazyPandas:
+    """Defers the real `import pandas` to first use - this module is loaded
+    at cold start by the Vercel wrapper backend regardless of which route is
+    hit, so an eager pandas import here cost every request that never
+    touches it."""
+    _mod = None
+
+    def __getattr__(self, attr):
+        if _LazyPandas._mod is None:
+            import pandas
+            _LazyPandas._mod = pandas
+        return getattr(_LazyPandas._mod, attr)
+
+
+pd = _LazyPandas()
 
 # ---------------------------------------------------------------------------
 # Reference lists -- edit these here if the user's data needs more coverage.
