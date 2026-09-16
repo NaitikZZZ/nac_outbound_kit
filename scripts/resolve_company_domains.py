@@ -54,6 +54,13 @@ from dotenv import load_dotenv
 
 load_dotenv()
 APOLLO_KEY = os.environ.get('APOLLO_API_KEY')
+# Cost-control kill switch (2026-09-10, user request: Apollo credit spend was
+# running high). When false, resolve() never falls through to the paid Apollo
+# org-search tier (step 6+ in the docstring above) - it stops at the free
+# tiers (cache/HubSpot/Clearbit/Brandfetch/Wikidata) and returns Unresolved
+# (or Clearbit's weak guess) instead of spending a credit. Re-enable by
+# setting PAID_ENRICHMENT_ENABLED=true (or unsetting it) in .env.
+PAID_ENRICHMENT_ENABLED = os.environ.get('PAID_ENRICHMENT_ENABLED', 'true').strip().lower() not in ('false', '0', 'no')
 # Two different .env conventions exist in this repo (root .env uses
 # HUBSPOT_API_KEY, wrapper/backend/.env uses HUBSPOT_PRIVATE_APP_TOKEN) since
 # this script runs standalone under both - accept either.
@@ -501,6 +508,8 @@ def estimate_needs_apollo(session, cache, company_name):
     key = norm(str(company_name).strip())
     if key in cache:
         return False
+    if not PAID_ENRICHMENT_ENABLED:
+        return False  # Apollo tier is disabled - resolve() will never spend a credit on this
     query_candidates = build_query_candidates(company_name)
     best, source, _cb_best, _cb_source = try_free_tiers(session, query_candidates)
     return best is None
@@ -535,6 +544,16 @@ def resolve(session, cache, company_name, employee_raw):
             'country': free_result.get('country', ''), 'city': free_result.get('city', ''),
             'source': free_source, 'candidates': [],
         }
+
+    if not PAID_ENRICHMENT_ENABLED:
+        # Apollo org search is disabled - fall back to Clearbit's weak guess
+        # if it had one, otherwise Unresolved. Never spend a credit here.
+        if cb_best:
+            return {
+                'domain': cb_best.get('domain', ''), 'linkedin': '', 'country': '', 'city': '',
+                'source': cb_source, 'candidates': [],
+            }
+        return {'domain': '', 'linkedin': '', 'country': '', 'city': '', 'source': 'Unresolved - paid enrichment disabled', 'candidates': []}
 
     accounts, qn, query_name = [], norm(full_name), full_name
     for q in query_candidates:
