@@ -1,0 +1,11 @@
+{
+  "done_pages": {
+    "account_created_at:True": 500,
+    "account_created_at:False": 500,
+    "account_updated_at:True": 500,
+    "account_updated_at:False": 500,
+    "account_last_activity_date:True": 500,
+    "account_last_activity_date:False": 500
+  },
+  "pass_exhausted": {}
+}
