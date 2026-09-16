@@ -47,6 +47,8 @@ Response: {"addedLeadsCount": 100, "updatedLeadsCount": 0, "failedLeadsCount": 0
 | Get campaign details | `GET /campaign/GetById` |
 | Pause campaign | `POST /campaign/Pause` |
 | Resume campaign | `POST /campaign/Resume` |
+
+> `Pause` takes `campaignId` as a **query parameter**, not a JSON body field (confirmed live 2026-09-03) - `POST /campaign/Pause?campaignId=567213`. Sending it in the JSON body returns 400 "The campaignId field is required."
 | Start (activate DRAFT) campaign | `POST /campaign/StartCampaign` |
 | Add leads to campaign | `POST /campaign/AddLeadsToCampaignV2` |
 | Get LinkedIn sender accounts | `POST /li_account/GetAll` |
