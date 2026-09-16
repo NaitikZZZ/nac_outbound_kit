@@ -64,6 +64,7 @@ Ask the user:
 - What is the input? (CSV path, HubSpot list ID, Apollo search, etc)
 - What region(s) do the leads cover?
 - Any deadline?
+- Which HubSpot Project is this campaign for? (used to look up the requestor and the Project record ID for the campaign name - see Naming Convention below)
 
 ### Step 1: Load and profile the leads
 ```python
@@ -166,7 +167,7 @@ Used when the user picks **Push copy to sequence** in Step -1 above. The user al
 Run the [csv-normalizer](.claude/skills/csv-normalizer) skill on every leads file handed over, regardless of platform, even though enrichment is skipped. Normalization is not enrichment - it's mandatory cleanup (name splitting, legal-suffix stripping, casing fixes, whitespace/location standardization) that must happen on every list before it touches any platform. Do this before Step B.
 
 ### Step B: Which platform(s)?
-Ask the user: Smartlead, HeyReach, Interakt, or any combination.
+Ask the user: Smartlead, HeyReach, Interakt, or any combination. Also confirm the HubSpot Project this push is for (requestor + Project record ID needed for the campaign name - see Naming Convention).
 
 ### Step C: Get the file(s) and push
 - **Smartlead selected** - ask for the normalized leads CSV and the sequence JSON (see the `sequence.json format` under Smartlead Details below). Confirm the campaign name follows the naming convention, then run `scripts/06_smartlead_create_campaign.py`. Leaves the campaign PAUSED for review (Critical Rule #6 still applies).
@@ -183,7 +184,7 @@ Do not run enrichment, segmentation, ZeroBounce, or copy generation in this path
 Every Smartlead campaign and HeyReach list name MUST follow:
 
 ```
-PRIORITY_TEAM_USECASE_REGION_CHANNEL_POCNAMESTARTDATE
+PRIORITY_TEAM_USECASE_REGION_CHANNEL_POCNAMESTARTDATE_PROJECTID
 ```
 
 Components (see `docs/campaign-naming-convention.md` for full tables):
@@ -192,13 +193,14 @@ Components (see `docs/campaign-naming-convention.md` for full tables):
 - **USECASE**: GRHIGH, ENT500, PASSDEAL, ACTDEAL, DREAM, BFSI, RETAIL, PREEVENT, POSTEVENT, INTENT, IPANON, FUNDING, EXECHIRE, CUSTOM-[X]
 - **REGION**: KSA / IDN / US / GCC / AFR / IND / PHL / UKEU / GLOBAL (multi-region: hyphenate alphabetically, e.g. `IND-US-UKEU`; `GLOBAL` stands alone)
 - **CHANNEL**: EMAIL / LI / WA / CALL (multi-channel: hyphenate in order of first touch, e.g. `EMAIL-LI`)
-- **POCNAME+STARTDATE**: one token, no separator. TitleCase first name(s), co-owners concatenated directly (`GauravNaitik`), then `DDMMMYY` appended directly (e.g. `GauravNaitik25AUG26`). Updated 2026-08-25; the old lowercase-hyphenated, underscore-separated form (`_gaurav-naitik_25AUG26`) is deprecated.
+- **POCNAME+STARTDATE**: one token, no separator. TitleCase first name of the HubSpot Project's **requestor** + the campaign **owner** (or just the owner if self-requested), concatenated directly (`GauravNaitik`), then `DDMMMYY` for **today's date** (the build/push date, not a future launch date) appended directly (e.g. `GauravNaitik25AUG26`). Updated 2026-08-25 for the token format; updated again 2026-09-11 so the token is Requestor+Owner rather than co-owners. The old lowercase-hyphenated, underscore-separated form (`_gaurav-naitik_25AUG26`) is deprecated.
+- **PROJECTID** (added 2026-09-11, standing rule): the linked HubSpot Project's record ID, appended after its own underscore, e.g. `_98765432`. Mandatory on every campaign name, across Smartlead, HeyReach, and Interakt. Look it up automatically: `python3 scripts/hubspot_project_lookup.py --search "<project name/keyword>"` (or `--id <record_id>`) - direct HubSpot REST API, read-only, uses `HUBSPOT_PRIVATE_APP_TOKEN`/`HUBSPOT_API_KEY` from `.env` (separate credential from the HubSpot MCP connector, whose own Project-object read is currently gated). Returns `record_id`, `requestor_name`, `campaign_owner_name` already resolved. If the script errors or finds no match, ask the user directly for the Project record ID, requestor name, and owner name instead of dropping the suffix.
+- The live ABM Wrapper app (`wrapper/`, source of truth `NaitikZZZ/smartlead-kit`) applies this same rule natively in `wrapper/backend/app/pipeline/naming.py` / `input_sources.py` (added 2026-09-11) - when a run is sourced from a HubSpot Project, `suggest_campaign_title` already builds the Requestor+Owner POC token and appends the Project ID with no extra script needed.
 
 Examples:
-- `P1_EVENTS_PREEVENT_US_EMAIL_Naitik16APR26`
-- `P2_API_PASSDEAL_IND_EMAIL-LI_Naitik14APR26`
-- `P0_ABM_DREAM_GCC_EMAIL-LI-WA_Rahul01MAY26`
-- `P0_ABM_API-HealthandWellness_GLOBAL_EMAIL-LI_GauravNaitik25AUG26`
+- `P1_EVENTS_PREEVENT_US_EMAIL_Naitik11SEP26_98765432`
+- `P2_API_PASSDEAL_IND_EMAIL-LI_GauravNaitik11SEP26_45612378`
+- `P0_ABM_DREAM_GCC_EMAIL-LI-WA_RahulNaitik11SEP26_11223344`
 
 ---
 

@@ -5,14 +5,16 @@
 ## The Formula
 
 ```
-PRIORITY _ TEAM _ USECASE _ REGION _ CHANNEL _ POCNAMESTARTDATE
+PRIORITY _ TEAM _ USECASE _ REGION _ CHANNEL _ POCNAMESTARTDATE _ PROJECTID
 ```
 
 Separator: underscore `_` between every component. No spaces. No other characters.
 
-The last component is an exception: **POC name and start date are one token with no separator between them** (e.g. `GauravNaitik25AUG26`), not two underscore-separated pieces. See [POC Name](#poc-name) and [Start Date](#start-date) below. Updated 2026-08-25 to match how the team actually names campaigns; the old `_POCNAME_STARTDATE` two-token form (e.g. `_gaurav-naitik_25AUG26`) is deprecated, don't use it for new campaigns.
+The `POCNAMESTARTDATE` component is an exception: **POC name and start date are one token with no separator between them** (e.g. `GauravNaitik25AUG26`), not two underscore-separated pieces. See [POC Name](#poc-name) and [Start Date](#start-date) below. Updated 2026-08-25 to match how the team actually names campaigns; the old `_POCNAME_STARTDATE` two-token form (e.g. `_gaurav-naitik_25AUG26`) is deprecated, don't use it for new campaigns.
 
-Order rationale: **Priority** first for instant triage. **Team and use case** for cross-team grouping. **Region** scopes the audience. **Channel** tells you the motion. **POC name** locks in ownership. **Start date** anchors it.
+The final component, **`PROJECTID`, is the HubSpot Project record ID**, appended after its own underscore (e.g. `..._GauravNaitik11SEP26_98765432`). Added 2026-09-11 as a standing rule across Smartlead, HeyReach, and Interakt so every campaign name traces back to its HubSpot Project record. See [HubSpot Project Record ID](#hubspot-project-record-id) below. Required on every campaign created from this date forward.
+
+Order rationale: **Priority** first for instant triage. **Team and use case** for cross-team grouping. **Region** scopes the audience. **Channel** tells you the motion. **POC name** locks in ownership. **Start date** anchors it. **Project ID** ties it back to HubSpot for tracking.
 
 ---
 
@@ -93,18 +95,24 @@ Order rationale: **Priority** first for instant triage. **Team and use case** fo
 
 ### POC Name
 
-TitleCase first name of campaign owner. No spaces, no separators. Multiple co-owners are concatenated directly, in the order given, each still TitleCase.
+Updated 2026-09-11: the POC name token is now **Requestor + Campaign Owner**, not just the campaign owner alone.
 
-| Input | Write as |
-|-------|---------|
-| Rahul Sharma | `Rahul` |
-| Priya Nair | `Priya` |
-| Rahul + Priya (co-own) | `RahulPriya` |
-| Gaurav + Naitik (co-own) | `GauravNaitik` |
+- **Requestor** - who asked for this campaign, pulled from the `requestor` property on the linked HubSpot Project record.
+- **Campaign Owner** - who is actually building/pushing the campaign, pulled from the Project's `hubspot_owner_id` (the Project's assigned owner).
+
+TitleCase first name only for each, no spaces, no separators, concatenated directly with Requestor first and Campaign Owner second. If a campaign has no separate requestor (owner requested their own work), the name is just the owner's first name, same as before.
+
+| Requestor | Campaign Owner | Write as |
+|-----------|-----------------|---------|
+| (none / self-requested) | Rahul Sharma | `Rahul` |
+| Gaurav Agarwal | Naitik Chavda | `GauravNaitik` |
+| Priya Nair | Naitik Chavda | `PriyaNaitik` |
+
+This replaces the old "co-owners concatenated" reading of multi-name tokens (e.g. `GauravNaitik` used to mean "Gaurav + Naitik co-own"; it now means "Gaurav requested, Naitik owns/pushed the campaign"). Genuine multi-owner campaigns (no distinct requestor) still concatenate co-owner first names in the order given, as before.
 
 ### Start Date
 
-`DDMMMYY` with uppercase three-letter month, appended **directly to the POC name with no separator**.
+`DDMMMYY` with uppercase three-letter month, appended **directly to the POC name with no separator**. Always the date the campaign is actually created/pushed to the platform (today's date at build time) - never a planned future go-live date, even if the campaign will stay paused for a while before launch.
 
 | Date | Format |
 |------|--------|
@@ -114,9 +122,21 @@ TitleCase first name of campaign owner. No spaces, no separators. Multiple co-ow
 
 Combined with POC name: `Naitik25AUG26`, `GauravNaitik25AUG26`.
 
+### HubSpot Project Record ID
+
+Added 2026-09-11. Every campaign in this kit is tied to a Project record in HubSpot (portal 6512810, `PROJECT` object). The final token in the name is that Project's numeric record ID, appended after an underscore: `..._<POCNAMESTARTDATE>_<PROJECTID>` (e.g. `..._GauravNaitik11SEP26_98765432`).
+
+Purpose: lets anyone trace a Smartlead campaign, HeyReach list/campaign, or Interakt push straight back to the HubSpot Project it belongs to, without cross-referencing a spreadsheet.
+
+Sourcing: fully automatic via `scripts/hubspot_project_lookup.py` (direct HubSpot REST API, read-only - not the HubSpot MCP connector, whose OAuth grant is missing Project-object access as of 2026-09-11; the private app token used here is a separate credential and isn't affected by that). Run `python3 scripts/hubspot_project_lookup.py --search "<project name or keyword>"` (or `--id <record_id>` if already known) - it returns `record_id`, `requestor_name`, and `campaign_owner_name` directly, already resolved from the raw owner IDs (needs the `crm.objects.owners.read` scope on the private app, added 2026-09-11). Build the POC token from `requestor_name` + `campaign_owner_name` + today's date, and append `_<record_id>` as the final suffix.
+
+If the script errors (token revoked, no matching Project, etc.), ask the user for the Project record ID and requestor/owner names directly instead of skipping the suffix - it is not optional.
+
 ---
 
 ## Full Examples
+
+Pre-2026-09-11 examples (no Project ID suffix, POC token is owner-only or co-owner-only):
 
 | Campaign Name | What It Means |
 |---------------|---------------|
@@ -131,16 +151,25 @@ Combined with POC name: `Naitik25AUG26`, `GauravNaitik25AUG26`.
 | `P0_EVENTS_DREAM_US_EMAIL-LI_RahulPriya05JAN26` | Events, Dream accounts, US, Email + LinkedIn, Rahul + Priya (co-own), Critical, Jan 5 2026 |
 | `P0_ABM_API-HealthandWellness_GLOBAL_EMAIL-LI_GauravNaitik25AUG26` | ABM, custom use case, Global, Email + LinkedIn, Gaurav + Naitik (co-own), Critical, Aug 25 2026 |
 
+Current format (from 2026-09-11 on), with the HubSpot Project ID suffix and Requestor+Owner POC token:
+
+| Campaign Name | What It Means |
+|---------------|---------------|
+| `P0_ABM_DREAM_US_EMAIL_Naitik11SEP26_98765432` | ABM, Dream account, US, Email, Naitik (self-requested), Critical, Sep 11 2026, HubSpot Project 98765432 |
+| `P1_EVENTS_PREEVENT_IND_EMAIL-LI_GauravNaitik11SEP26_45612378` | Events, Pre-event, India, Email + LinkedIn, requested by Gaurav / owned by Naitik, High, Sep 11 2026, HubSpot Project 45612378 |
+| `P2_ABM_BFSI_GCC_LI_PriyaNaitik11SEP26_11223344` | ABM, BFSI industry, GCC, LinkedIn, requested by Priya / owned by Naitik, Medium, Sep 11 2026, HubSpot Project 11223344 |
+
 ---
 
-## 6 Steps to Name Your Campaign
+## 7 Steps to Name Your Campaign
 
 1. **Set priority** - Board-level (P0), strategic (P1), standard (P2), nurture (P3)
 2. **Identify team** - EVENTS / PRTNR / API / ABM
 3. **Pick use case** - see Section 3.3. If not listed, use `CUSTOM-[X]`
 4. **Define region** - use region code, multi-region hyphenated alphabetically, or `GLOBAL` for worldwide
 5. **Choose channel(s)** - single or hyphenated in first-touch order
-6. **Add POC name + start date as one token** - TitleCase first name(s) concatenated with no separator, then `DDMMMYY` appended directly with no separator (e.g. `GauravNaitik25AUG26`)
+6. **Add POC name + start date as one token** - TitleCase requestor first name (if any) + campaign owner first name, concatenated with no separator, then today's date as `DDMMMYY` appended directly with no separator (e.g. `GauravNaitik11SEP26`)
+7. **Append the HubSpot Project record ID** - underscore, then the Project's numeric record ID (e.g. `_98765432`)
 
 ---
 
@@ -155,6 +184,8 @@ Combined with POC name: `Naitik25AUG26`, `GauravNaitik25AUG26`.
 - Lowercase month (`apr26` instead of `APR26`)
 - Using "Email" or "LinkedIn" as free text instead of the codes (`EMAIL`, `LI`)
 - Using region names like "India" instead of codes (`IND`)
+- Forgetting the HubSpot Project record ID suffix, or putting it before the POC name/date instead of after
+- Using a planned future launch date instead of today's date (the build/push date) for the Start Date component
 
 ---
 
