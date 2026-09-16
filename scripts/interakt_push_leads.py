@@ -67,17 +67,23 @@ def build_payload(row, args):
     return payload
 
 
-def push_user(payload):
-    resp = requests.post(
-        TRACK_USER_URL,
-        json=payload,
-        headers={
-            "Authorization": f"Basic {API_KEY}",
-            "Content-Type": "application/json",
-        },
-        timeout=15,
-    )
-    return resp.status_code, resp.text
+def push_user(payload, retries=3):
+    for attempt in range(retries):
+        try:
+            resp = requests.post(
+                TRACK_USER_URL,
+                json=payload,
+                headers={
+                    "Authorization": f"Basic {API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                timeout=15,
+            )
+            return resp.status_code, resp.text
+        except requests.exceptions.RequestException as e:
+            if attempt == retries - 1:
+                raise
+            time.sleep(2 * (attempt + 1))
 
 
 def main():

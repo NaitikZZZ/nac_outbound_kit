@@ -91,6 +91,8 @@ def build_payload(row, args):
     }
     if args.header_col:
         template["headerValues"] = [row.get(args.header_col, "").strip()]
+    elif args.header_value:
+        template["headerValues"] = [args.header_value]
 
     payload = {
         "fullPhoneNumber": full_phone,
@@ -117,6 +119,7 @@ def main():
     parser.add_argument("--template-category", default=None, help="e.g. marketing, utility, authentication — must match the template's approved category")
     parser.add_argument("--language-code", default="en")
     parser.add_argument("--header-col", default=None, help="Column to fill the template's header variable, if any")
+    parser.add_argument("--header-value", default=None, help="Fixed header value applied to every row (e.g. image URL for an IMAGE-header template). Ignored if --header-col is set.")
     parser.add_argument("--body-col", action="append", default=None, help="Column to fill the next {{n}} body variable, in order (repeatable)")
     parser.add_argument("--campaign-id", default=None)
     parser.add_argument("--limit", type=int, default=None)
