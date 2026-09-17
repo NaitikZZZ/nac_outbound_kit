@@ -119,7 +119,19 @@ export default function App() {
         <div className="main-head" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div>
             <h1>{run ? run.message : "New enrichment run"}</h1>
-            {run && <p style={{ fontSize: 13, marginTop: 4 }}>Run {run.run_id}</p>}
+            {run && (
+              <p style={{ fontSize: 13, marginTop: 4, display: "flex", alignItems: "center", gap: 8 }}>
+                Run {run.run_id}
+                <button
+                  className="btn-secondary"
+                  style={{ fontSize: 11, padding: "2px 8px" }}
+                  onClick={() => { setRunId(null); setRun(null); }}
+                  title="Forget this run and go back to a blank form - the run itself keeps going, this only clears what this browser resumes"
+                >
+                  Start new run
+                </button>
+              </p>
+            )}
           </div>
           <ConfigBadges appConfig={appConfig} />
         </div>
