@@ -54,6 +54,8 @@ def build_payload(row, args):
     name = " ".join(p for p in [first, last] if p)
     if name:
         traits["name"] = name
+    if first:
+        traits["first_name"] = first
     if args.email_col and row.get(args.email_col, "").strip():
         traits["email"] = row[args.email_col].strip()
     if args.company_col and row.get(args.company_col, "").strip():
