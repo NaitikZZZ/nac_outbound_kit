@@ -38,7 +38,11 @@ Full product details in `reference/xoxoday-products.md`.
 ## Critical Rules
 
 1. **Never display API keys** in chat output, files, or code blocks. Load from `.env` silently.
-2. **HubSpot is read-only.** Never write, update, or create anything in HubSpot. Read context only. **One scoped exception:** the "HubSpot Integration" toggle inside a Smartlead campaign (which syncs campaign activity into HubSpot) is enabled by default per `config/smartlead-campaign-defaults.yaml`, confirmed by the user on 2026-08-25. This exception applies ONLY to that toggle. Every other write path to HubSpot (direct API, MCP tools, manual edits) stays prohibited.
+2. **HubSpot is read-only.** Never write, update, or create anything in HubSpot. Read context only. **Two scoped exceptions:**
+   - The "HubSpot Integration" toggle inside a Smartlead campaign (syncs campaign activity into HubSpot), enabled by default per `config/smartlead-campaign-defaults.yaml`, confirmed by the user on 2026-08-25.
+   - When a campaign build is linked to a HubSpot Project (via the naming convention's PROJECTID lookup), the pipeline may post **one** summary note to that Project record after the campaign is created, containing: campaign name, product, team, priority, lead count, segments, dream-account summary (and any other per-file processing summary shared with the user), Smartlead campaign ID (PAUSED), HeyReach list ID (if any), and GTM-enrichment Claude token/cost usage. Confirmed by the user on 2026-09-16.
+
+   These are the only writes permitted. Every other write path to HubSpot (direct API, MCP tools, manual edits) stays prohibited.
 3. **No em dashes or en dashes** in any output (emails, copy, docs). Use hyphens, commas, or rewrite.
 4. **Campaign names follow the official convention** (see `docs/campaign-naming-convention.md`). Always.
 5. **Ask before running enrichment** if the lead count is over 500 (credit cost check).

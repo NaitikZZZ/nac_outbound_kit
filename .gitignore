@@ -57,3 +57,5 @@ wrapper/backend/runs/
 wrapper/backend/cache/
 wrapper/frontend/node_modules/
 wrapper/frontend/dist/
+.vercel
+.env*
