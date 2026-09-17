@@ -12,6 +12,12 @@
       "runtimeExecutable": "bash",
       "runtimeArgs": ["-c", "cd wrapper/frontend && npm run dev -- --port 5173"],
       "port": 5173
+    },
+    {
+      "name": "abm-wrapper-inngest-dev",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["inngest-cli@latest", "dev", "-u", "http://127.0.0.1:8731/api/inngest", "--port", "8288"],
+      "port": 8288
     }
   ]
 }

@@ -160,6 +160,43 @@ def _redis_hset_batch(key, items):
             raise last_exc
 
 
+def _redis_hmget(key, fields):
+    """Targeted read of specific hash fields via Upstash's HMGET, sent
+    through the same /pipeline POST endpoint _redis_hset_batch already uses
+    for writes - unlike _redis_hgetall's full-hash HSCAN (which pages through
+    the entire ~290k-company cache, several minutes, no matter how few
+    companies the caller actually needs), this costs a fixed few round trips
+    that scale with how many fields are requested, not with cache size."""
+    if not fields:
+        return {}
+    out = {}
+    unique_fields = list(dict.fromkeys(fields))
+    for i in range(0, len(unique_fields), _REDIS_PIPELINE_BATCH):
+        batch = unique_fields[i:i + _REDIS_PIPELINE_BATCH]
+        commands = [['HMGET', key] + batch]
+        last_exc = None
+        for attempt in range(1, 9):
+            try:
+                r = requests.post(f'{_REDIS_URL}/pipeline',
+                                   headers={'Authorization': f'Bearer {_REDIS_TOKEN}', 'Content-Type': 'application/json'},
+                                   data=json.dumps(commands).encode('utf-8'), timeout=30)
+                r.raise_for_status()
+                result = r.json()[0].get('result')
+                if result is None:
+                    raise RuntimeError(f"HMGET failed: {r.text}")
+                last_exc = None
+                break
+            except (requests.exceptions.RequestException, RuntimeError, IndexError, KeyError) as e:
+                last_exc = e
+                time.sleep(min(3 * attempt, 20))
+        if last_exc:
+            raise last_exc
+        for field, value in zip(batch, result):
+            if value is not None:
+                out[field] = json.loads(value)
+    return out
+
+
 _LEGAL_SUFFIX_RE = re.compile(
     r'[,]?\s*\(?\b(incorporated|corporation|company|limited|pte\.?\s*ltd\.?|pty\.?\s*ltd\.?|'
     r'p\.?\s*ltd\.?|inc\.?|llc\.?|ltd\.?|corp\.?|plc\.?|gmbh\.?|co\.?|'
@@ -218,6 +255,29 @@ def load_cache():
         return {}
     with open(CACHE_PATH, newline='', encoding='utf-8') as f:
         return {row['company_key']: row for row in csv.DictReader(f)}
+
+
+def load_cache_for_names(names):
+    """Targeted cache load, scoped to just the given company names - both the
+    full-name key and the pre-'/'-slash key resolve() checks. Use this
+    instead of load_cache() whenever the caller already knows which specific
+    companies it needs (the normal case: resolving a list of a handful to a
+    few hundred companies), so it doesn't pay for pulling the entire
+    ~290k-company Redis cache first (see _redis_hgetall's docstring - that
+    full scan alone can take several minutes, unrelated to how many
+    companies are actually being resolved). Falls back to load_cache()
+    verbatim when Redis isn't configured, since the local CSV file is
+    already read whole in one fast local file op either way."""
+    if not _redis_configured():
+        return load_cache()
+    keys = set()
+    for name in names:
+        full_name = str(name).strip()
+        if not full_name:
+            continue
+        keys.add(norm(full_name))
+        keys.add(norm(full_name.split('/')[0].strip()))
+    return _redis_hmget(_REDIS_KEY, sorted(keys))
 
 
 def save_cache(cache):
@@ -653,7 +713,7 @@ def main():
     df = pd.read_csv(input_csv)
     companies = df[[company_col, employee_col]].drop_duplicates(subset=[company_col])
 
-    cache = load_cache()
+    cache = load_cache_for_names(companies[company_col])
     session = requests.Session()
     session.mount('https://', requests.adapters.HTTPAdapter(max_retries=0))
 
