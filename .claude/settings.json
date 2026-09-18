@@ -1,4 +1,19 @@
 {
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Bash(git push*)",
+            "command": "branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null); if [ \"$branch\" = \"main\" ]; then changed=$(git diff --name-only '@{u}@{1}' '@{u}' 2>/dev/null); if printf '%s\\n' \"$changed\" | grep -q '^wrapper/'; then printf '{\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"additionalContext\":\"This push to origin/main touched wrapper/. Standing rule: port the wrapper/ changes to smartlead-kit now, without asking first. This repo already has a smartlead-kit git remote configured (https://github.com/NaitikZZZ/smartlead-kit.git) -- branch off smartlead-kit main, apply the ported diff, push the branch to the smartlead-kit remote, and open a PR against NaitikZZZ/smartlead-kit with gh. Never push directly to smartlead-kit main.\"}}'; fi; fi",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  },
   "permissions": {
     "allow": [
       "mcp__Claude_in_Chrome__tabs_context_mcp",
