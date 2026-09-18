@@ -56,9 +56,7 @@ Full product details in `reference/xoxoday-products.md`.
 ## Standard Workflow
 
 ### Step -1: Choose the agent
-Before anything else, ask the user: **Enrich the data**, or **Push copy to sequence**?
-- **Enrich the data** - the full raw-leads-to-campaign pipeline (enrich, segment, write copy, launch). Continue to Step 0 below.
-- **Push copy to sequence** - the user already has a list (leads) and finished copy (email/LinkedIn/WhatsApp) ready; the job is to normalize the list and push the copy into Smartlead, HeyReach, and/or Interakt. No enrichment, segmentation, or copywriting happens here. Jump to "Campaign Push Agent Workflow" below and skip the rest of this section.
+**Disabled by default (standing rule, 2026-09-18): do not ask this question.** Go straight to the **Enrich the data** workflow (Step 0 below) without prompting. The **Push copy to sequence** / Campaign Push Agent path (defined below, kept for reference, not deleted) is too slow to offer by default and stays off the table until the user explicitly asks for it by name (e.g. "use the copy agent" / "push copy to sequence"). Only then jump to "Campaign Push Agent Workflow" below.
 
 ### Step 0: Understand the request
 Ask the user:
