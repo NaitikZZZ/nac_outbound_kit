@@ -68,6 +68,7 @@ Ask the user:
 - What region(s) do the leads cover?
 - Any deadline?
 - Which HubSpot Project is this campaign for? (used to look up the requestor and the Project record ID for the campaign name - see Naming Convention below)
+- Do you want to remove competitors from your list? (**default: yes** - runs Step 5.5 below against `reference/xoxoday-competitors.csv`; the user can say no if they want to keep competitors in the list)
 
 ### Step 1: Load and profile the leads
 ```python
@@ -105,6 +106,19 @@ Flag:
 - `catch-all` - send with caution
 - `do_not_mail` - drop
 - `unknown / error` - retry or drop
+
+### Step 5.5: Competitor exclusion
+Default is yes per the Step 0 answer above. Run the [competitor-exclusion](.claude/skills/competitor-exclusion) skill:
+
+```bash
+python3 .claude/skills/competitor-exclusion/scripts/check_competitors.py \
+    --prospects <leads-so-far.csv> \
+    --ok-out outputs/<campaign-name>/prospects-ok-to-reach.csv \
+    --excluded-out outputs/<campaign-name>/prospects-competitors-excluded.csv \
+    --summary-out outputs/<campaign-name>/competitor-exclusion-summary.md
+```
+
+Matches against `reference/xoxoday-competitors.csv` on company name (fuzzy) or website/email domain. Report the summary counts and a few example excluded rows (with competitor name, category, threat level) before continuing with the OK list. If the user answered no in Step 0, skip this step entirely and keep the full list.
 
 ### Step 6: Segment the leads
 Based on the deal intent / use case / region. Common segments:
@@ -325,6 +339,7 @@ Full rule set: `docs/cold-outbound-email-sop.md` (Manoj Agarwal SOP, authoritati
 - `reference/xoxoday-products.md` - product bible for positioning
 - `reference/global-api-strategy-2026.md` - GTM priorities and segments
 - `reference/icp-scoring-criteria.md` - ICP rubric per product
+- `reference/xoxoday-competitors.csv` - competitor list used by Step 5.5 (competitor exclusion), 531 companies with category/threat/notes
 - `docs/cadence-blueprint.md` - 11-day multi-channel cadence
 - `docs/data-enrichment-waterfall.md` - full enrichment flow
 - `docs/campaign-naming-convention.md` - naming standard
