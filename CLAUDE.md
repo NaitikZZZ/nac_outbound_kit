@@ -50,6 +50,7 @@ Full product details in `reference/xoxoday-products.md`.
 7. **Segment lead lists** before writing copy. Different intent signals need different angles.
 8. **Region-match sender accounts** in Smartlead (Indian sender names for India leads, Western names for US, etc).
 9. **Save all outputs to an `outputs/` folder** (gitignored). Never commit lead data.
+10. **Apollo paid enrichment is paused (standing rule, 2026-09-21, credit exhaustion).** Skip Step 3 (Apollo People Match) below and any other paid Apollo credit spend (email reveal, phone reveal) by default, in both the manual workflow and the live ABM Wrapper backend. Step 2 (free Apollo bulk lookup against CRM-synced contacts) keeps running since it costs no credits. For leads Apollo's free lookup can't resolve, go straight to Clay waterfall (Step 4) or ask the user instead of running Apollo People Match. The wrapper backend enforces this via `PAID_ENRICHMENT_ENABLED=false` (already set in `wrapper/backend/.env`, ported to smartlead-kit). Resume only when the user explicitly says "use apollo" - then flip `PAID_ENRICHMENT_ENABLED` back to `true` in both repos' `.env` (and the deployed Vercel env var, if it's set there too) and stop skipping Step 3 here.
 
 ---
 
@@ -83,7 +84,9 @@ Use `scripts/01_apollo_bulk_lookup.py`. This searches existing Apollo contacts (
 Typical hit rate: 60-80% of leads already exist.
 
 ### Step 3: Apollo People Match (PAID)
-For the 20-40% not found, use `scripts/02_apollo_enrich_missing.py`. This consumes Apollo lead credits (1 per lead). Before running, confirm with the user how many will be enriched.
+**Paused by default (standing rule #10, 2026-09-21): skip this step until the user explicitly says "use apollo".** Go straight to Step 4 (Clay) for anything not resolved by Step 2's free lookup, or ask the user how they want to proceed.
+
+Once resumed: for the 20-40% not found, use `scripts/02_apollo_enrich_missing.py`. This consumes Apollo lead credits (1 per lead). Before running, confirm with the user how many will be enriched.
 
 ### Step 4: Clay waterfall (OPTIONAL, PAID)
 For leads Apollo can't find (generic emails, small companies, personal emails), export to Clay and run waterfall enrichment. Clay returns:
@@ -264,7 +267,7 @@ Examples:
 ## Enrichment Waterfall (Cheapest to Expensive)
 
 1. **Apollo CRM-synced contacts** - free, use first
-2. **Apollo People Match** - 1 lead credit each
+2. **Apollo People Match** - 1 lead credit each. **Paused (standing rule #10, 2026-09-21) - skip until the user says "use apollo".**
 3. **Clay waterfall** - variable per provider (LeadMagic > Findymail > RocketReach > Wiza > FullEnrich etc.)
 4. **ZeroBounce** - email validation (always do this last, before Smartlead upload)
 
